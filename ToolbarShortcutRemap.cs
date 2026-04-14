@@ -402,3 +402,48 @@ static class ToolbarShortcutRemap_ToolBarButtonShortcut_Init_Patch
     }
 }
 
+// When the user presses group 1's shortcut after cycling group 3 to item 3-2,
+// group 3's GUI keeps showing 3-2 as active. The fix: whenever any group's active
+// button is set (via SetLastPressedButton), immediately reset all OTHER groups back
+// to index 0 so their GUI reflects the first item.
+[HarmonyPatch(typeof(ToolBarButtonGroupsSO), nameof(ToolBarButtonGroupsSO.SetLastPressedButton))]
+static class ToolbarShortcutRemap_ToolBarButtonGroupsSO_SetLastPressedButton_Patch
+{
+    [ThreadStatic]
+    private static bool _resetting;
+
+    static void Postfix(ToolBarButtonGroupsSO __instance, InputAction inputAction)
+    {
+        if (_resetting)
+        {
+            return;
+        }
+
+        Dictionary<InputAction, ToolBarButtonGroup> groups = Traverse.Create(__instance)
+            .Field("_buttonsByInput")
+            .GetValue<Dictionary<InputAction, ToolBarButtonGroup>>();
+        if (groups == null)
+        {
+            return;
+        }
+
+        _resetting = true;
+        try
+        {
+            foreach (InputAction action in groups.Keys)
+            {
+                if (ReferenceEquals(action, inputAction))
+                {
+                    continue;
+                }
+
+                __instance.SetLastPressedButton(action, 0);
+            }
+        }
+        finally
+        {
+            _resetting = false;
+        }
+    }
+}
+
