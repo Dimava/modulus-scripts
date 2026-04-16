@@ -1,5 +1,5 @@
 Compile errors in CounterEMA.cs:
-The type or namespace name 'ShortState' could not be found (are you missing a using directive or an assembly reference?) (152,24)
-The type or namespace name 'ShortState' could not be found (are you missing a using directive or an assembly reference?) (69,12)
-The type or namespace name 'ShortState' could not be found (are you missing a using directive or an assembly reference?) (104,55)
-The type or namespace name 'ShortState' could not be found (are you missing a using directive or an assembly reference?) (105,8)
+The type or namespace name 'ShortState' could not be found (are you missing a using directive or an assembly reference?) (150,24)
+The type or namespace name 'ShortState' could not be found (are you missing a using directive or an assembly reference?) (67,12)
+The type or namespace name 'ShortState' could not be found (are you missing a using directive or an assembly reference?) (102,55)
+The type or namespace name 'ShortState' could not be found (are you missing a using directive or an assembly reference?) (103,8)

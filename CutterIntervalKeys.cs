@@ -9,6 +9,7 @@ using UnityEngine.InputSystem;
 /// Press 1/2/3/4 while the cutter interior UI is open to select the matching cut interval.
 /// Press E to accept (Ready button) in the Cutter, Assembler, Stamper, or StamperMK2 UIs —
 /// only when the Ready button is actually interactable (i.e. the machine is configured).
+/// Press R to reset in any of those UIs — only when the Reset button is interactable.
 /// </summary>
 public static class CutterIntervalKeys
 {
@@ -68,6 +69,15 @@ public class CutterIntervalKeyHandler : MonoBehaviour
              || TryPressReady<StamperUI>()
              || TryPressReady<StamperMK2UI>();
         }
+
+        if (Keyboard.current[Key.R].wasPressedThisFrame)
+        {
+            // Reset only fires when the Reset button is interactable.
+            _ = TryPressReset<CutterUI>()
+             || TryPressReset<AssemblerUI>()
+             || TryPressReset<StamperUI>()
+             || TryPressReset<StamperMK2UI>();
+        }
     }
 
     /// <summary>
@@ -86,6 +96,25 @@ public class CutterIntervalKeyHandler : MonoBehaviour
             return true; // UI is open but not ready — consume the search, don't fall through.
 
         Traverse.Create(ui).Method("Ready", new object[] { 0 }).GetValue();
+        return true;
+    }
+
+    /// <summary>
+    /// If a UI of type T is currently open and its Reset button is interactable, click it.
+    /// Returns true if the UI was found (regardless of whether Reset fired).
+    /// </summary>
+    private static bool TryPressReset<T>() where T : MonoBehaviour
+    {
+        T ui = FindObjectOfType<T>();
+        if (ui == null)
+            return false;
+
+        // _resetButton is declared on InsideOperatorUI; Traverse searches inherited fields.
+        var resetButton = Traverse.Create(ui).Field("_resetButton").GetValue<MachineButton>();
+        if (resetButton == null || !resetButton.Interactable)
+            return true; // UI is open but reset is disabled — consume, don't fall through.
+
+        Traverse.Create(ui).Method("Reset", new object[] { 0 }).GetValue();
         return true;
     }
 
