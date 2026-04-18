@@ -1,24 +1,23 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reflection;
-using HarmonyLib;
-using MelonLoader;
 using Data.Operator;
+using HarmonyLib;
 using Presentation.FactoryFloor.Toolbar;
 using Presentation.UI.Toolbar;
+using ScriptEngine;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public static class ToolbarGroupLogger
+[ScriptEntry]
+public sealed class ToolbarGroupLogger : ScriptMod
 {
     private sealed class ButtonRecord
     {
         public string Label = "";
         public string ButtonType = "";
         public string BreadcrumbId = "";
-        public string HierarchyPath = "";
         public bool PartOfInputActionGroup;
         public bool IsGroupStart;
         public bool HasShortcut;
@@ -43,39 +42,30 @@ public static class ToolbarGroupLogger
         public readonly List<ButtonRecord> Buttons = new List<ButtonRecord>();
     }
 
-    private static readonly HarmonyLib.Harmony HarmonyInstance = new HarmonyLib.Harmony("toolbar-group-logger");
+    private static ToolbarGroupLogger? _instance;
     private static readonly Dictionary<int, int> CategoryCounters = new Dictionary<int, int>();
     private static readonly Dictionary<int, ButtonRecord> ButtonRecords = new Dictionary<int, ButtonRecord>();
-    private static readonly object LogLock = new object();
 
-    private static CategoryContext _currentCategory;
-    private static string _logPath = "";
+    private static CategoryContext? _currentCategory;
 
-    public static void OnLoad()
+    protected override void OnEnable()
     {
-        string logsDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Scripts", "logs");
-        Directory.CreateDirectory(logsDir);
-        _logPath = Path.Combine(logsDir, "ToolbarGroupLogger.log");
-
-        HarmonyInstance.UnpatchSelf();
-        HarmonyInstance.PatchAll(typeof(ToolbarGroupLogger).Assembly);
-
-        Log("");
-        Log("============================================================");
-        Log("ToolbarGroupLogger loaded");
-        Log("Watching operator toolbar category builds.");
-        Log($"Log file: {_logPath}");
-        MelonLogger.Msg($"[ToolbarGroupLogger] Loaded. Writing to {_logPath}");
-    }
-
-    public static void OnUnload()
-    {
-        HarmonyInstance.UnpatchSelf();
+        _instance = this;
         CategoryCounters.Clear();
         ButtonRecords.Clear();
         _currentCategory = null;
-        Log("ToolbarGroupLogger unloaded");
-        MelonLogger.Msg("[ToolbarGroupLogger] Unloaded.");
+        Log("Watching operator toolbar category builds.");
+    }
+
+    protected override void OnDisable()
+    {
+        CategoryCounters.Clear();
+        ButtonRecords.Clear();
+        _currentCategory = null;
+        if (ReferenceEquals(_instance, this))
+        {
+            _instance = null;
+        }
     }
 
     internal static void BeginBarBuild(OperatorBar bar)
@@ -86,7 +76,6 @@ public static class ToolbarGroupLogger
         }
 
         CategoryCounters[bar.GetInstanceID()] = 0;
-        Log($"BAR buildmode={bar.BuildMode} object={bar.name}");
     }
 
     internal static void BeginCategory(OperatorBar bar, OperatorBarCategory category)
@@ -111,8 +100,6 @@ public static class ToolbarGroupLogger
             CategoryIndex = index,
             CategoryColor = category.CategoryColor
         };
-
-        Log($"CATEGORY begin mode={_currentCategory.BuildMode} index={_currentCategory.CategoryIndex} color={FormatColor(_currentCategory.CategoryColor)}");
     }
 
     internal static void RegisterButton(ToolBarButton button, OperatorBarButtonSO data)
@@ -127,7 +114,6 @@ public static class ToolbarGroupLogger
             Label = DescribeToolBarButton(button),
             ButtonType = button.GetType().Name,
             BreadcrumbId = SafeReadBreadcrumbId(button),
-            HierarchyPath = BuildHierarchyPath(button.transform),
             PartOfInputActionGroup = data != null && data.PartOfInputActionGroup,
             IsGroupStart = data != null && data.IsGroupStart
         };
@@ -138,7 +124,7 @@ public static class ToolbarGroupLogger
             _currentCategory.Buttons.Add(record);
         }
 
-        Log($"BUTTON mode={(_currentCategory != null ? _currentCategory.BuildMode.ToString() : "?")} category={(_currentCategory != null ? _currentCategory.CategoryIndex.ToString() : "?")} label={record.Label} breadcrumb={record.BreadcrumbId} grouped={record.PartOfInputActionGroup} groupStart={record.IsGroupStart} path={record.HierarchyPath}");
+        // Too noisy during normal play; keep end-of-category summary logs instead.
     }
 
     internal static void RegisterShortcut(ToolBarButtonShortcut shortcut)
@@ -161,8 +147,7 @@ public static class ToolbarGroupLogger
             {
                 Label = DescribeToolBarButton(button),
                 ButtonType = button.GetType().Name,
-                BreadcrumbId = SafeReadBreadcrumbId(button),
-                HierarchyPath = BuildHierarchyPath(button.transform)
+                BreadcrumbId = SafeReadBreadcrumbId(button)
             };
             ButtonRecords[button.GetInstanceID()] = record;
             if (_currentCategory != null)
@@ -179,8 +164,6 @@ public static class ToolbarGroupLogger
         record.HasBoundInput = hasBoundInput;
         record.ShortcutAction = DescribeInputAction(inputAction);
         record.ShortcutIndex = groupIndex;
-
-        Log($"SHORTCUT label={record.Label} action={record.ShortcutAction} index={record.ShortcutIndex} bound={record.HasBoundInput}");
     }
 
     internal static void EndCategory()
@@ -192,7 +175,7 @@ public static class ToolbarGroupLogger
             return;
         }
 
-        Log($"CATEGORY summary mode={context.BuildMode} index={context.CategoryIndex} color={FormatColor(context.CategoryColor)} buttons={context.Buttons.Count}");
+        LogLine($"CATEGORY summary mode={context.BuildMode} index={context.CategoryIndex} color={FormatColor(context.CategoryColor)} buttons={context.Buttons.Count}");
 
         List<ButtonRecord> groupedButtons = context.Buttons
             .Where(static button => button.HasShortcut && !string.IsNullOrEmpty(button.ShortcutAction))
@@ -209,7 +192,7 @@ public static class ToolbarGroupLogger
 
             string summary = string.Join(" | ", members.Select(static button => $"{button.ShortcutIndex}:{button.Label}"));
             string singletonTag = members.Count == 1 ? " singleton=true" : "";
-            Log($"GROUP mode={context.BuildMode} category={context.CategoryIndex} action={shortcutGroup.Key} count={members.Count}{singletonTag} members={summary}");
+            LogLine($"GROUP mode={context.BuildMode} category={context.CategoryIndex} action={shortcutGroup.Key} count={members.Count}{singletonTag} members={summary}");
         }
 
         List<ButtonRecord> noShortcut = context.Buttons
@@ -218,7 +201,7 @@ public static class ToolbarGroupLogger
             .ToList();
         if (noShortcut.Count > 0)
         {
-            Log($"NO_SHORTCUT mode={context.BuildMode} category={context.CategoryIndex} count={noShortcut.Count} members={string.Join(" | ", noShortcut.Select(static button => button.Label))}");
+            LogLine($"NO_SHORTCUT mode={context.BuildMode} category={context.CategoryIndex} count={noShortcut.Count} members={string.Join(" | ", noShortcut.Select(static button => button.Label))}");
         }
 
         List<ButtonRecord> ungroupedByAsset = context.Buttons
@@ -227,7 +210,7 @@ public static class ToolbarGroupLogger
             .ToList();
         if (ungroupedByAsset.Count > 0)
         {
-            Log($"UNGROUPED_BY_ASSET mode={context.BuildMode} category={context.CategoryIndex} count={ungroupedByAsset.Count} members={string.Join(" | ", ungroupedByAsset.Select(static button => button.Summary()))}");
+            LogLine($"UNGROUPED_BY_ASSET mode={context.BuildMode} category={context.CategoryIndex} count={ungroupedByAsset.Count} members={string.Join(" | ", ungroupedByAsset.Select(static button => button.Summary()))}");
         }
     }
 
@@ -306,37 +289,14 @@ public static class ToolbarGroupLogger
         return inputAction.name ?? "<unnamed>";
     }
 
-    private static string BuildHierarchyPath(Transform transform)
-    {
-        if (transform == null)
-        {
-            return "";
-        }
-
-        List<string> parts = new List<string>();
-        Transform current = transform;
-        while (current != null)
-        {
-            parts.Add(current.name);
-            current = current.parent;
-        }
-        parts.Reverse();
-        return string.Join("/", parts);
-    }
-
     private static string FormatColor(Color color)
     {
         return "#" + ColorUtility.ToHtmlStringRGBA(color);
     }
 
-    private static void Log(string message)
+    private static void LogLine(string message)
     {
-        string line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {message}";
-        lock (LogLock)
-        {
-            File.AppendAllText(_logPath, line + Environment.NewLine);
-        }
-        MelonLogger.Msg($"[ToolbarGroupLogger] {message}");
+        _instance?.Log(message);
     }
 }
 

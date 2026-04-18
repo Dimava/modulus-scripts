@@ -1,29 +1,30 @@
 using Data.Minimap;
 using HarmonyLib;
-using MelonLoader;
 using Presentation.CameraView;
 using Presentation.Locators;
+using ScriptEngine;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
 /// <summary>
 /// Middle-click on the minimap resets the camera yaw to north (0 degrees).
 /// </summary>
-public static class MinimapMiddleClickResetRotation
+[ScriptEntry]
+public sealed class MinimapMiddleClickResetRotation : ScriptMod
 {
-    private static readonly HarmonyLib.Harmony HarmonyInstance = new HarmonyLib.Harmony("minimap-middleclick-reset-rotation");
+    private static MinimapMiddleClickResetRotation _instance;
 
-    public static void OnLoad()
+    protected override void OnEnable()
     {
-        HarmonyInstance.UnpatchSelf();
-        HarmonyInstance.PatchAll(typeof(MinimapMiddleClickResetRotation).Assembly);
-        MelonLogger.Msg("[MinimapMiddleClickResetRotation] Loaded.");
+        _instance = this;
     }
 
-    public static void OnUnload()
+    protected override void OnDisable()
     {
-        HarmonyInstance.UnpatchSelf();
-        MelonLogger.Msg("[MinimapMiddleClickResetRotation] Unloaded.");
+        if (ReferenceEquals(_instance, this))
+        {
+            _instance = null;
+        }
     }
 
     internal static void ResetCameraRotation()
@@ -37,11 +38,11 @@ public static class MinimapMiddleClickResetRotation
             }
 
             Traverse.Create(cameraView).Method("LerpYaw", new object[] { 0f }).GetValue();
-            MelonLogger.Msg("[MinimapMiddleClickResetRotation] Camera rotation reset to north.");
+            _instance?.Log("Camera rotation reset to north.");
             return;
         }
 
-        MelonLogger.Warning("[MinimapMiddleClickResetRotation] Could not find CameraViewLocator.");
+        _instance?.Warn("Could not find CameraViewLocator.");
     }
 }
 

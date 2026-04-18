@@ -3,6 +3,7 @@ using HarmonyLib;
 using MelonLoader;
 using Presentation.FactoryFloor.Toolbar;
 using Presentation.UI.Toolbar;
+using ScriptEngine;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -14,21 +15,9 @@ using UnityEngine.InputSystem;
 /// Pressing the key again while index 0 is already selected will cycle
 /// to index 1, and so on — same as vanilla.
 /// </summary>
-public static class FirstBuildingTypeOnShortcut
+[ScriptEntry]
+public sealed class FirstBuildingTypeOnShortcut : ScriptMod
 {
-    static readonly HarmonyLib.Harmony _harmony = new HarmonyLib.Harmony("first-building-type-on-shortcut");
-
-    public static void OnLoad()
-    {
-        _harmony.UnpatchSelf();
-        _harmony.PatchAll(typeof(FirstBuildingTypeOnShortcut).Assembly);
-        MelonLogger.Msg("[FirstBuildingTypeOnShortcut] Loaded.");
-    }
-
-    public static void OnUnload()
-    {
-        _harmony.UnpatchSelf();
-    }
 }
 
 // On keypress: if nothing selected, reset to index 0 and update visuals before cycling

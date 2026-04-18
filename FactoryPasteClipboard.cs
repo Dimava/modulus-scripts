@@ -1,56 +1,58 @@
 using System;
-using System.Collections.Generic;
 using System.Text;
 using HarmonyLib;
-using Logic.Factory.Blueprint;
 using Logic.Factory;
+using Logic.Factory.Blueprint;
 using Logic.FactoryTools;
 using Data.FactoryFloor;
-using Data.Operator;
-using MelonLoader;
-using Newtonsoft.Json;
 using Presentation.FactoryFloor;
 using Presentation.Locators;
 using SaveData.FactoryFloor;
+using ScriptEngine;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using Utils.JsonConverterUtils;
+using Newtonsoft.Json;
 
-public static class FactoryPasteClipboard
+[ScriptEntry]
+public sealed class FactoryPasteClipboard : ScriptMod
 {
-    static readonly HarmonyLib.Harmony _harmony = new("factory-paste-clipboard");
-    const string ClipboardPrefix = "modulus-blueprint:";
-    const string ClipboardBlueprintName = "Clipboard";
-    static GameObject? _gameObject;
-    static Blueprint? _clipboard;
-    static string _clipboardLabel = "clipboard";
+    private static FactoryPasteClipboard? _instance;
+    private const string ClipboardPrefix = "modulus-blueprint:";
+    private const string ClipboardBlueprintName = "Clipboard";
+    private static Blueprint? _clipboard;
+    private static string _clipboardLabel = "clipboard";
 
-    public static void OnLoad()
+    protected override void OnEnable()
     {
-        if (_gameObject != null)
-            GameObject.Destroy(_gameObject);
-
-        _gameObject = new GameObject("__FactoryPasteClipboard__");
-        GameObject.DontDestroyOnLoad(_gameObject);
-        _gameObject.AddComponent<FactoryPasteClipboardBehaviour>();
-
-        _harmony.UnpatchSelf();
-        _harmony.PatchAll(typeof(FactoryPasteClipboard).Assembly);
-
-        MelonLogger.Msg("[FactoryPasteClipboard] Loaded. Duplicate selections update the clipboard automatically, V pastes, Ctrl+C/Ctrl+V use the system clipboard.");
+        _instance = this;
     }
 
-    public static void OnUnload()
+    protected override void OnDisable()
     {
-        _harmony.UnpatchSelf();
         _clipboard = null;
-
-        if (_gameObject != null)
+        if (ReferenceEquals(_instance, this))
         {
-            GameObject.Destroy(_gameObject);
-            _gameObject = null;
+            _instance = null;
         }
+    }
+
+    protected override void OnUpdate()
+    {
+        if (IsUiFocused())
+            return;
+
+        var keyboard = Keyboard.current;
+        if (keyboard == null)
+            return;
+
+        var ctrlHeld = keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed;
+        if (ctrlHeld && keyboard.cKey.wasPressedThisFrame)
+            TryCopySelectedToolToClipboard();
+
+        if (keyboard.vKey.wasPressedThisFrame)
+            TryPaste(preferSystemClipboard: ctrlHeld);
     }
 
     internal static bool TryCopySelectedToolToClipboard()
@@ -102,7 +104,7 @@ public static class FactoryPasteClipboard
         placementTool.SetRotation(0, resetLastRotation: true);
         toolSystem.SelectTool(placementTool, blueprint);
 
-        MelonLogger.Msg($"[FactoryPasteClipboard] Paste ready: {_clipboardLabel}");
+        _instance?.Log($"Paste ready: {_clipboardLabel}");
     }
 
     internal static void AutoCopySelection(SelectionFactoryTool selectionTool, string source)
@@ -116,7 +118,7 @@ public static class FactoryPasteClipboard
         if (!StoreBlueprint(blueprint))
             return;
 
-        MelonLogger.Msg($"[FactoryPasteClipboard] Auto-copied from {source}: {_clipboardLabel}");
+        _instance?.Log($"Auto-copied from {source}: {_clipboardLabel}");
     }
 
     static bool StoreBlueprint(Blueprint? blueprint)
@@ -128,9 +130,9 @@ public static class FactoryPasteClipboard
         _clipboardLabel = DescribeBlueprint(_clipboard);
 
         if (TryWriteClipboardString(_clipboard))
-            MelonLogger.Msg($"[FactoryPasteClipboard] Copied: {_clipboardLabel} (system clipboard updated)");
+            _instance?.Log($"Copied: {_clipboardLabel} (system clipboard updated)");
         else
-            MelonLogger.Msg($"[FactoryPasteClipboard] Copied: {_clipboardLabel}");
+            _instance?.Log($"Copied: {_clipboardLabel}");
 
         return true;
     }
@@ -152,7 +154,7 @@ public static class FactoryPasteClipboard
         }
         catch (Exception ex)
         {
-            MelonLogger.Warning($"[FactoryPasteClipboard] Failed to decode system clipboard blueprint: {ex.Message}");
+            _instance?.Warn($"Failed to decode system clipboard blueprint: {ex.Message}");
             return false;
         }
 
@@ -173,7 +175,7 @@ public static class FactoryPasteClipboard
         if (!StoreBlueprint(blueprint))
             return false;
 
-        MelonLogger.Msg($"[FactoryPasteClipboard] Loaded from system clipboard: {_clipboardLabel}");
+        _instance?.Log($"Loaded from system clipboard: {_clipboardLabel}");
         return true;
     }
 
@@ -187,7 +189,7 @@ public static class FactoryPasteClipboard
         }
         catch (Exception ex)
         {
-            MelonLogger.Warning($"[FactoryPasteClipboard] Failed to write system clipboard blueprint: {ex.Message}");
+            _instance?.Warn($"Failed to write system clipboard blueprint: {ex.Message}");
             return false;
         }
     }
@@ -227,26 +229,6 @@ public static class FactoryPasteClipboard
         }
 
         return null;
-    }
-}
-
-public sealed class FactoryPasteClipboardBehaviour : MonoBehaviour
-{
-    void Update()
-    {
-        if (IsUiFocused())
-            return;
-
-        var keyboard = Keyboard.current;
-        if (keyboard == null)
-            return;
-
-        var ctrlHeld = keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed;
-        if (ctrlHeld && keyboard.cKey.wasPressedThisFrame)
-            FactoryPasteClipboard.TryCopySelectedToolToClipboard();
-
-        if (keyboard.vKey.wasPressedThisFrame)
-            FactoryPasteClipboard.TryPaste(preferSystemClipboard: ctrlHeld);
     }
 
     static bool IsUiFocused()

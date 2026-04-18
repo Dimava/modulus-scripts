@@ -5,29 +5,30 @@ using Data.FactoryFloor.Resources;
 using Data.Shapes;
 using Data.Statistics;
 using HarmonyLib;
-using MelonLoader;
+using ScriptEngine;
 using UnityEngine;
 
-public static class ClampDeliveries
+[ScriptEntry]
+public sealed class ClampDeliveries : ScriptMod
 {
-    private static readonly HarmonyLib.Harmony HarmonyInstance = new HarmonyLib.Harmony("clamp-deliveries");
+    private static ClampDeliveries? _instance;
     private static readonly Dictionary<RotationIndependentHash, uint> ChallengeCaps = new Dictionary<RotationIndependentHash, uint>();
     private static readonly Dictionary<int, uint> DeliveryCaps = new Dictionary<int, uint>();
 
-    public static void OnLoad()
+    protected override void OnEnable()
     {
-        HarmonyInstance.UnpatchSelf();
-        HarmonyInstance.PatchAll(typeof(ClampDeliveries).Assembly);
+        _instance = this;
         RebuildChallengeCaps();
-        MelonLogger.Msg("[ClampDeliveries] Loaded.");
     }
 
-    public static void OnUnload()
+    protected override void OnDisable()
     {
-        HarmonyInstance.UnpatchSelf();
         ChallengeCaps.Clear();
         DeliveryCaps.Clear();
-        MelonLogger.Msg("[ClampDeliveries] Unloaded.");
+        if (ReferenceEquals(_instance, this))
+        {
+            _instance = null;
+        }
     }
 
     public static void RebuildChallengeCaps()

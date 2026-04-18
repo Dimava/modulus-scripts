@@ -1,15 +1,16 @@
 using System;
 using System.Collections.Generic;
 using HarmonyLib;
-using MelonLoader;
 using Presentation.FactoryFloor.Toolbar;
 using Presentation.UI.Toolbar;
+using ScriptEngine;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
-public static class ToolbarShortcutRemap
+[ScriptEntry]
+public sealed class ToolbarShortcutRemap : ScriptMod
 {
-    private static readonly HarmonyLib.Harmony HarmonyInstance = new HarmonyLib.Harmony("toolbar-shortcut-remap");
+    private static ToolbarShortcutRemap _instance;
 
     private static readonly Dictionary<string, string> BreadcrumbToTargetAction = new Dictionary<string, string>(StringComparer.Ordinal)
     {
@@ -64,19 +65,19 @@ public static class ToolbarShortcutRemap
 
     private static readonly Dictionary<string, InputActionReference> ActionCache = new Dictionary<string, InputActionReference>(StringComparer.Ordinal);
 
-    public static void OnLoad()
+    protected override void OnEnable()
     {
-        HarmonyInstance.UnpatchSelf();
-        HarmonyInstance.PatchAll(typeof(ToolbarShortcutRemap).Assembly);
+        _instance = this;
         ApplyToExistingShortcuts();
-        MelonLogger.Msg("[ToolbarShortcutRemap] Loaded.");
     }
 
-    public static void OnUnload()
+    protected override void OnDisable()
     {
-        HarmonyInstance.UnpatchSelf();
         ActionCache.Clear();
-        MelonLogger.Msg("[ToolbarShortcutRemap] Unloaded.");
+        if (ReferenceEquals(_instance, this))
+        {
+            _instance = null;
+        }
     }
 
     internal static void RemapShortcutAction(ToolBarButtonShortcut shortcut)
@@ -101,7 +102,7 @@ public static class ToolbarShortcutRemap
         InputActionReference targetReference = ResolveActionReference(targetActionName);
         if (targetReference == null)
         {
-            MelonLogger.Warning($"[ToolbarShortcutRemap] Could not find InputActionReference for {targetActionName} while remapping {breadcrumb}.");
+            _instance?.Warn($"Could not find InputActionReference for {targetActionName} while remapping {breadcrumb}.");
             return;
         }
 
@@ -112,7 +113,7 @@ public static class ToolbarShortcutRemap
         }
 
         Traverse.Create(shortcut).Field("_groupInputAction").SetValue(targetReference);
-        MelonLogger.Msg($"[ToolbarShortcutRemap] {breadcrumb} -> {targetActionName}");
+        _instance?.Log($"{breadcrumb} -> {targetActionName}");
     }
 
     internal static void NormalizeShortcutGroup(ToolBarButtonShortcut shortcut)
@@ -215,7 +216,7 @@ public static class ToolbarShortcutRemap
         }
 
         groupSo.SetLastPressedButton(inputActionReference.action, 0);
-        MelonLogger.Msg($"[ToolbarShortcutRemap] Normalized {actionName}: {JoinBreadcrumbs(activeButtons)}");
+        _instance?.Log($"Normalized {actionName}: {JoinBreadcrumbs(activeButtons)}");
     }
 
     private static void ApplyToExistingShortcuts()
@@ -311,7 +312,7 @@ public static class ToolbarShortcutRemap
                 if (string.Equals(GetBreadcrumb(buttons[i]), activeBreadcrumb, StringComparison.Ordinal))
                 {
                     groupSo.SetLastPressedButton(actionReference.action, i);
-                    MelonLogger.Msg($"[ToolbarShortcutRemap] Selected {activeBreadcrumb} in {actionName}");
+                    _instance?.Log($"Selected {activeBreadcrumb} in {actionName}");
                     return;
                 }
             }
@@ -446,4 +447,3 @@ static class ToolbarShortcutRemap_ToolBarButtonGroupsSO_SetLastPressedButton_Pat
         }
     }
 }
-

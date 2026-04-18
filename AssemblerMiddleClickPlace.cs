@@ -1,8 +1,8 @@
 using HarmonyLib;
 using Logic.Assembling;
-using MelonLoader;
 using Presentation.UI.OperatorUIs;
 using Presentation.UI.OperatorUIs.InsideOperatorUIs;
+using ScriptEngine;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Utils;
@@ -13,29 +13,10 @@ using Utils;
 ///   • Zone has shapes already   → steal it into drag mode at the cursor so you can
 ///                                  position it relative to what's already there.
 /// </summary>
-public static class AssemblerMiddleClickPlace
+[ScriptEntry]
+public sealed class AssemblerMiddleClickPlace : ScriptMod
 {
-    private static GameObject _go;
-
-    public static void OnLoad()
-    {
-        if (_go != null) GameObject.Destroy(_go);
-        _go = new GameObject("__AssemblerMiddleClickPlace__");
-        GameObject.DontDestroyOnLoad(_go);
-        _go.AddComponent<AssemblerMiddleClickBehaviour>();
-        MelonLogger.Msg("[AssemblerMiddleClickPlace] Loaded.");
-    }
-
-    public static void OnUnload()
-    {
-        if (_go != null) { GameObject.Destroy(_go); _go = null; }
-        MelonLogger.Msg("[AssemblerMiddleClickPlace] Unloaded.");
-    }
-}
-
-public class AssemblerMiddleClickBehaviour : MonoBehaviour
-{
-    private void Update()
+    protected override void OnUpdate()
     {
         if (Mouse.current == null) return;
         if (!Mouse.current.middleButton.wasPressedThisFrame) return;

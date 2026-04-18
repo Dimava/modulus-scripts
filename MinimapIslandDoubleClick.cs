@@ -1,9 +1,9 @@
 using Data.FactoryFloor.Maps;
 using Data.Minimap;
 using HarmonyLib;
-using MelonLoader;
 using Presentation.CameraView;
 using Presentation.Locators;
+using ScriptEngine;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
@@ -11,9 +11,10 @@ using UnityEngine.EventSystems;
 /// Double-clicking an island on the minimap resets yaw to north, moves the camera
 /// to the island center, and zooms to a good overview distance.
 /// </summary>
-public static class MinimapIslandDoubleClick
+[ScriptEntry]
+public sealed class MinimapIslandDoubleClick : ScriptMod
 {
-    private static readonly HarmonyLib.Harmony HarmonyInstance = new HarmonyLib.Harmony("minimap-island-doubleclick");
+    private static MinimapIslandDoubleClick _instance;
 
     // Zoom percentage: 0 = fully zoomed out, 1 = fully zoomed in.
     // 0.25 gives a comfortable island overview.
@@ -22,17 +23,17 @@ public static class MinimapIslandDoubleClick
     // Pitch in degrees. CameraView clamps between _minPitch (25) and _maxPitch (70).
     public const float IslandPitch = 45f;
 
-    public static void OnLoad()
+    protected override void OnEnable()
     {
-        HarmonyInstance.UnpatchSelf();
-        HarmonyInstance.PatchAll(typeof(MinimapIslandDoubleClick).Assembly);
-        MelonLogger.Msg("[MinimapIslandDoubleClick] Loaded.");
+        _instance = this;
     }
 
-    public static void OnUnload()
+    protected override void OnDisable()
     {
-        HarmonyInstance.UnpatchSelf();
-        MelonLogger.Msg("[MinimapIslandDoubleClick] Unloaded.");
+        if (ReferenceEquals(_instance, this))
+        {
+            _instance = null;
+        }
     }
 
     internal static CameraView FindCameraView()
@@ -45,6 +46,16 @@ public static class MinimapIslandDoubleClick
             }
         }
         return null;
+    }
+
+    internal static void LogInfo(string message)
+    {
+        _instance?.Log(message);
+    }
+
+    internal static void LogWarn(string message)
+    {
+        _instance?.Warn(message);
     }
 }
 
@@ -71,7 +82,7 @@ public class MinimapIslandClickHandler : MonoBehaviour, IPointerClickHandler
         CameraView cameraView = MinimapIslandDoubleClick.FindCameraView();
         if (cameraView == null)
         {
-            MelonLogger.Warning("[MinimapIslandDoubleClick] CameraView not found.");
+            MinimapIslandDoubleClick.LogWarn("CameraView not found.");
             return;
         }
 
@@ -86,7 +97,7 @@ public class MinimapIslandClickHandler : MonoBehaviour, IPointerClickHandler
             false                                    // blockInput
         );
 
-        MelonLogger.Msg($"[MinimapIslandDoubleClick] Flying to island at {worldCenter}.");
+        MinimapIslandDoubleClick.LogInfo($"Flying to island at {worldCenter}.");
     }
 }
 

@@ -1,37 +1,18 @@
 using HarmonyLib;
-using MelonLoader;
 using Presentation.UI.OperatorUIs;
 using Presentation.UI.OperatorUIs.InsideOperatorUIs;
+using ScriptEngine;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
 /// Press 1/2/3/4 while the cutter interior UI is open to select the matching cut interval.
-/// Press E to accept (Ready button) in the Cutter, Assembler, Stamper, or StamperMK2 UIs —
+/// Press E to accept (Ready button) in the Cutter, Assembler, Stamper, or StamperMK2 UIs -
 /// only when the Ready button is actually interactable (i.e. the machine is configured).
-/// Press Q to reset in any of those UIs — only when the Reset button is interactable.
+/// Press Q to reset in any of those UIs - only when the Reset button is interactable.
 /// </summary>
-public static class CutterIntervalKeys
-{
-    private static GameObject _go;
-
-    public static void OnLoad()
-    {
-        if (_go != null) GameObject.Destroy(_go);
-        _go = new GameObject("CutterIntervalKeyHandler");
-        Object.DontDestroyOnLoad(_go);
-        _go.AddComponent<CutterIntervalKeyHandler>();
-        MelonLogger.Msg("[CutterIntervalKeys] Loaded.");
-    }
-
-    public static void OnUnload()
-    {
-        if (_go != null) { GameObject.Destroy(_go); _go = null; }
-        MelonLogger.Msg("[CutterIntervalKeys] Unloaded.");
-    }
-}
-
-public class CutterIntervalKeyHandler : MonoBehaviour
+[ScriptEntry]
+public sealed class CutterIntervalKeys : ScriptMod
 {
     private static readonly Key[] IntervalKeys =
     {
@@ -41,13 +22,11 @@ public class CutterIntervalKeyHandler : MonoBehaviour
         Key.Digit4,
     };
 
-    private void Update()
+    protected override void OnUpdate()
     {
         if (Keyboard.current == null)
             return;
 
-        // FindObjectOfType only finds active (enabled) components,
-        // so these are non-null only while the cutter menu is open.
         CutterUIInterval interval = FindObjectOfType<CutterUIInterval>();
         if (interval != null)
         {
@@ -63,7 +42,6 @@ public class CutterIntervalKeyHandler : MonoBehaviour
 
         if (Keyboard.current[Key.E].wasPressedThisFrame)
         {
-            // Try each UI type in turn; stop at the first one that's open and ready.
             _ = TryPressButton<CutterUI>("_readyButton")
              || TryPressButton<AssemblerUI>("_readyButton")
              || TryPressButton<StamperUI>("_readyButton")
@@ -72,7 +50,6 @@ public class CutterIntervalKeyHandler : MonoBehaviour
 
         if (Keyboard.current[Key.Q].wasPressedThisFrame)
         {
-            // Reset only fires when the Reset button itself accepts input.
             _ = TryPressButton<CutterUI>("_resetButton")
              || TryPressButton<AssemblerUI>("_resetButton")
              || TryPressButton<StamperUI>("_resetButton")
@@ -80,21 +57,15 @@ public class CutterIntervalKeyHandler : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// If a UI of type T is currently open and the requested button is interactable,
-    /// trigger it through MachineButton's normal click path.
-    /// Returns true if the UI was found (regardless of whether the click fired).
-    /// </summary>
     private static bool TryPressButton<T>(string buttonFieldName) where T : MonoBehaviour
     {
         T ui = FindObjectOfType<T>();
         if (ui == null)
             return false;
 
-        // Buttons are declared on InsideOperatorUI; Traverse searches inherited fields.
         var button = Traverse.Create(ui).Field(buttonFieldName).GetValue<MachineButton>();
         if (button == null || !button.Interactable)
-            return true; // UI is open but not ready — consume the search, don't fall through.
+            return true;
 
         button.OnPointerDown(null);
         button.OnPointerUp(null);

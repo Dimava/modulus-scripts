@@ -6,28 +6,14 @@ using Data.FactoryFloor.Buildings;
 using Data.Variables.Cranes;
 using HarmonyLib;
 using Logic.Factory;
-using MelonLoader;
 using Presentation.UI;
 using Presentation.UI.OperatorUIs.OperatorPanelUIs.Buildings;
+using ScriptEngine;
 using UnityEngine;
 
-public static class SingleItemBeltEstimatedThroughput
+[ScriptEntry]
+public sealed class SingleItemBeltEstimatedThroughput : ScriptMod
 {
-    private static readonly HarmonyLib.Harmony HarmonyInstance = new HarmonyLib.Harmony("single-item-belt-estimated-throughput");
-
-    public static void OnLoad()
-    {
-        HarmonyInstance.UnpatchSelf();
-        HarmonyInstance.PatchAll(typeof(SingleItemBeltEstimatedThroughput).Assembly);
-        MelonLogger.Msg("[SingleItemBeltEstimatedThroughput] Loaded.");
-    }
-
-    public static void OnUnload()
-    {
-        HarmonyInstance.UnpatchSelf();
-        MelonLogger.Msg("[SingleItemBeltEstimatedThroughput] Unloaded.");
-    }
-
     public sealed class EstimateData
     {
         public int[] Requirements;

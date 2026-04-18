@@ -2,6 +2,7 @@ using DG.Tweening;
 using HarmonyLib;
 using MelonLoader;
 using Presentation.Shapes;
+using ScriptEngine;
 using UnityEngine;
 
 /// <summary>
@@ -14,22 +15,9 @@ using UnityEngine;
 /// re-enabling the real renderer, and clearing _isAnimating — then the normal
 /// method body runs as if no animation was in progress.
 /// </summary>
-public static class CutterRotateInstant
+[ScriptEntry]
+public sealed class CutterRotateInstant : ScriptMod
 {
-    static readonly HarmonyLib.Harmony _harmony = new HarmonyLib.Harmony("cutter-rotate-instant");
-
-    public static void OnLoad()
-    {
-        _harmony.UnpatchSelf();
-        _harmony.PatchAll(typeof(CutterRotateInstant).Assembly);
-        MelonLogger.Msg("[CutterRotateInstant] Loaded.");
-    }
-
-    public static void OnUnload()
-    {
-        _harmony.UnpatchSelf();
-    }
-
     /// <summary>
     /// If a rotation animation is currently running, complete it immediately
     /// (jump to end values + fire callbacks) so <c>_isAnimating</c> becomes

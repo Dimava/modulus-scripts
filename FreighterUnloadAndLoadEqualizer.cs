@@ -2,23 +2,14 @@ using Data.FactoryFloor.FactoryObjectBehaviours;
 using Data.FactoryFloor.Freighter.Actions;
 using Data.Variables;
 using HarmonyLib;
-using MelonLoader;
+using ScriptEngine;
 
-public static class FreighterUnloadAndLoadEqualizer
+[ScriptEntry]
+public sealed class FreighterUnloadAndLoadEqualizer : ScriptMod
 {
-    static readonly HarmonyLib.Harmony _harmony = new HarmonyLib.Harmony("freighter-unload-and-load-equalizer");
-
-    public static void OnLoad()
+    protected override void OnEnable()
     {
-        _harmony.UnpatchSelf();
-        _harmony.PatchAll(typeof(FreighterUnloadAndLoadEqualizer).Assembly);
-        MelonLogger.Msg("[FreighterUnloadAndLoadEqualizer] Loaded. Unload And Load now equalizes cargo by half-difference.");
-    }
-
-    public static void OnUnload()
-    {
-        _harmony.UnpatchSelf();
-        MelonLogger.Msg("[FreighterUnloadAndLoadEqualizer] Unloaded.");
+        Log("Unload And Load now equalizes cargo by half-difference.");
     }
 
     static int GetHalfDifference(int higherAmount, int lowerAmount)
