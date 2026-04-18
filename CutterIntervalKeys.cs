@@ -9,7 +9,7 @@ using UnityEngine.InputSystem;
 /// Press 1/2/3/4 while the cutter interior UI is open to select the matching cut interval.
 /// Press E to accept (Ready button) in the Cutter, Assembler, Stamper, or StamperMK2 UIs —
 /// only when the Ready button is actually interactable (i.e. the machine is configured).
-/// Press R to reset in any of those UIs — only when the Reset button is interactable.
+/// Press Q to reset in any of those UIs — only when the Reset button is interactable.
 /// </summary>
 public static class CutterIntervalKeys
 {
@@ -64,57 +64,40 @@ public class CutterIntervalKeyHandler : MonoBehaviour
         if (Keyboard.current[Key.E].wasPressedThisFrame)
         {
             // Try each UI type in turn; stop at the first one that's open and ready.
-            _ = TryPressReady<CutterUI>()
-             || TryPressReady<AssemblerUI>()
-             || TryPressReady<StamperUI>()
-             || TryPressReady<StamperMK2UI>();
+            _ = TryPressButton<CutterUI>("_readyButton")
+             || TryPressButton<AssemblerUI>("_readyButton")
+             || TryPressButton<StamperUI>("_readyButton")
+             || TryPressButton<StamperMK2UI>("_readyButton");
         }
 
-        if (Keyboard.current[Key.R].wasPressedThisFrame)
+        if (Keyboard.current[Key.Q].wasPressedThisFrame)
         {
-            // Reset only fires when the Reset button is interactable.
-            _ = TryPressReset<CutterUI>()
-             || TryPressReset<AssemblerUI>()
-             || TryPressReset<StamperUI>()
-             || TryPressReset<StamperMK2UI>();
+            // Reset only fires when the Reset button itself accepts input.
+            _ = TryPressButton<CutterUI>("_resetButton")
+             || TryPressButton<AssemblerUI>("_resetButton")
+             || TryPressButton<StamperUI>("_resetButton")
+             || TryPressButton<StamperMK2UI>("_resetButton");
         }
     }
 
     /// <summary>
-    /// If a UI of type T is currently open and its Ready button is interactable, click it.
-    /// Returns true if the UI was found (regardless of whether Ready fired).
+    /// If a UI of type T is currently open and the requested button is interactable,
+    /// trigger it through MachineButton's normal click path.
+    /// Returns true if the UI was found (regardless of whether the click fired).
     /// </summary>
-    private static bool TryPressReady<T>() where T : MonoBehaviour
+    private static bool TryPressButton<T>(string buttonFieldName) where T : MonoBehaviour
     {
         T ui = FindObjectOfType<T>();
         if (ui == null)
             return false;
 
-        // _readyButton is declared on InsideOperatorUI; Traverse searches inherited fields.
-        var readyButton = Traverse.Create(ui).Field("_readyButton").GetValue<MachineButton>();
-        if (readyButton == null || !readyButton.Interactable)
+        // Buttons are declared on InsideOperatorUI; Traverse searches inherited fields.
+        var button = Traverse.Create(ui).Field(buttonFieldName).GetValue<MachineButton>();
+        if (button == null || !button.Interactable)
             return true; // UI is open but not ready — consume the search, don't fall through.
 
-        Traverse.Create(ui).Method("Ready", new object[] { 0 }).GetValue();
-        return true;
-    }
-
-    /// <summary>
-    /// If a UI of type T is currently open and its Reset button is interactable, click it.
-    /// Returns true if the UI was found (regardless of whether Reset fired).
-    /// </summary>
-    private static bool TryPressReset<T>() where T : MonoBehaviour
-    {
-        T ui = FindObjectOfType<T>();
-        if (ui == null)
-            return false;
-
-        // _resetButton is declared on InsideOperatorUI; Traverse searches inherited fields.
-        var resetButton = Traverse.Create(ui).Field("_resetButton").GetValue<MachineButton>();
-        if (resetButton == null || !resetButton.Interactable)
-            return true; // UI is open but reset is disabled — consume, don't fall through.
-
-        Traverse.Create(ui).Method("Reset", new object[] { 0 }).GetValue();
+        button.OnPointerDown(null);
+        button.OnPointerUp(null);
         return true;
     }
 

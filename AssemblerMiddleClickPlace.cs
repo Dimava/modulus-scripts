@@ -2,6 +2,7 @@ using HarmonyLib;
 using Logic.Assembling;
 using MelonLoader;
 using Presentation.UI.OperatorUIs;
+using Presentation.UI.OperatorUIs.InsideOperatorUIs;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Utils;
@@ -40,21 +41,49 @@ public class AssemblerMiddleClickBehaviour : MonoBehaviour
         if (!Mouse.current.middleButton.wasPressedThisFrame) return;
 
         var assemblerUI = FindObjectOfType<AssemblerUI>();
-        if (assemblerUI == null || !assemblerUI.isActiveAndEnabled) return;
+        if (assemblerUI == null || !assemblerUI.isActiveAndEnabled)
+        {
+            _ = TryPressReady<CutterUI>()
+             || TryPressReady<StamperUI>()
+             || TryPressReady<StamperMK2UI>();
+            return;
+        }
 
         var tUI = Traverse.Create(assemblerUI);
         var assembleStack = tUI.Field("_assembleStack").GetValue<AssembleStack>();
         var assembleZone  = tUI.Field("_assembleZone").GetValue<AssembleZone>();
         if (assembleStack == null || assembleZone == null) return;
 
-        // Don't interrupt an in-progress drag
-        if (assembleZone.IsHoldingShape) return;
-
         // Find the first stack slot that still has its shape on the stack
         var stackShapesRaw = Traverse.Create(assembleStack).Field("_stackShapes").GetValue();
         if (stackShapesRaw == null) return;
 
         var stackArr = (System.Array)stackShapesRaw;
+
+        // Third middle-click: if we're already dragging the last remaining shape,
+        // place it and accept the recipe.
+        if (assembleZone.IsHoldingShape)
+        {
+            if (!HasAnyShapeOnStack(stackArr))
+            {
+                var heldShape = assembleZone.CurrentHoldingShape;
+                if (heldShape != null)
+                {
+                    Traverse.Create(assembleZone).Method("StopHoldingShape", heldShape).GetValue();
+                    PressReadyIfInteractable(assemblerUI);
+                }
+            }
+            return;
+        }
+
+        // Plain middle-click should also behave like the regular accept button
+        // when there is nothing left to take from the stack.
+        if (!HasAnyShapeOnStack(stackArr))
+        {
+            PressReadyIfInteractable(assemblerUI);
+            return;
+        }
+
         ClickableShape firstShape = null;
         for (int i = 0; i < stackArr.Length; i++)
         {
@@ -85,23 +114,54 @@ public class AssemblerMiddleClickBehaviour : MonoBehaviour
         }
         else
         {
-            // Subsequent shape: pre-position at the cursor so it doesn't flash at the
-            // stack's world position before DragShape runs next frame.
-            var tZone   = Traverse.Create(assembleZone);
-            var camera  = tZone.Field("_camera").GetValue<Camera>();
+            var tZone = Traverse.Create(assembleZone);
             var planeTf = tZone.Field("_plane").GetValue<Transform>();
-            if (camera != null && planeTf != null)
-            {
-                Ray ray = camera.ScreenPointToRay(Mouse.current.position.ReadValue());
-                if (new UnityEngine.Plane(Vector3.up, planeTf.position).Raycast(ray, out float enter))
-                {
-                    Vector3 pos = ray.GetPoint(enter);
-                    pos.y = Mathf.Max(pos.y, assembleZone.transform.position.y);
-                    held.ShapeLoader.Position = ShapeUtils.SnapPositionToVoxelGrid(pos, held.ShapeLoader.Shape);
-                    tZone.Method("MoveShapeToNotOverlap", held).GetValue();
-                }
-            }
-            // Left-click release will drop it via the normal StopHoldingShape flow.
+
+            // Use the game's built-in drag path. The drag plane appears to sit above
+            // the assembler floor, so compensate only in Y and let DragShape handle
+            // cursor projection, clamping, snapping, and overlap resolution.
+            float floorOffsetY = planeTf != null
+                ? assembleZone.transform.position.y - planeTf.position.y
+                : 0f;
+            tZone.Field("_holdingOffset").SetValue(new Vector3(0f, floorOffsetY, 0f));
+            tZone.Method("DragShape").GetValue();
         }
+    }
+
+    private static bool HasAnyShapeOnStack(System.Array stackArr)
+    {
+        for (int i = 0; i < stackArr.Length; i++)
+        {
+            var elem = Traverse.Create(stackArr.GetValue(i));
+            if (elem.Field("IsOnStack").GetValue<bool>())
+                return true;
+        }
+
+        return false;
+    }
+
+    private static void PressReadyIfInteractable(AssemblerUI assemblerUI)
+    {
+        var readyButton = Traverse.Create(assemblerUI).Field("_readyButton").GetValue<MachineButton>();
+        if (readyButton == null || !readyButton.Interactable)
+            return;
+
+        readyButton.OnPointerDown(null);
+        readyButton.OnPointerUp(null);
+    }
+
+    private static bool TryPressReady<T>() where T : MonoBehaviour
+    {
+        T ui = FindObjectOfType<T>();
+        if (ui == null)
+            return false;
+
+        var readyButton = Traverse.Create(ui).Field("_readyButton").GetValue<MachineButton>();
+        if (readyButton == null || !readyButton.Interactable)
+            return true;
+
+        readyButton.OnPointerDown(null);
+        readyButton.OnPointerUp(null);
+        return true;
     }
 }

@@ -56,7 +56,7 @@ public class ConnectionHotkeyBehaviour : MonoBehaviour
     private void Update()
     {
         if (Keyboard.current == null) return;
-        if (!Keyboard.current[Key.R].wasPressedThisFrame) return;
+        if (!Keyboard.current[Key.Q].wasPressedThisFrame) return;
 
         // Building panel open → crane placement mode
         var buildingPanel = FindObjectOfType<BuildingPanelUI>();
