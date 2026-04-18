@@ -11,7 +11,7 @@ using Presentation.UI.OperatorUIs.OperatorPanelUIs.Buildings;
 using Presentation.UI.OperatorUIs.OperatorPanelUIs.HarvesterPad;
 using ScriptEngine;
 using UnityEngine;
-using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 /// <summary>
 /// Press R while a Building panel is open      -> crane-placement mode (Add Crane button).
@@ -30,31 +30,56 @@ using UnityEngine.InputSystem;
 [ScriptEntry]
 public sealed class ConnectionHotkey : ScriptMod
 {
+    protected override void OnEnable()
+    {
+        BindKey("Connect", "Q");
+        BindKey("AutoUpgrade", "U");
+    }
+
     protected override void OnUpdate()
     {
-        if (Keyboard.current == null || !Keyboard.current[Key.Q].wasPressedThisFrame)
+        if (WasPressed("Connect"))
         {
-            return;
+            HarvesterPadUI harvesterPanel = FindActiveObjectOfType<HarvesterPadUI>();
+            if (harvesterPanel != null)
+            {
+                Traverse.Create(harvesterPanel).Method("LinkBuildingBtnPressed").GetValue();
+                return;
+            }
+
+            SupplyTankUI supplyTankPanel = FindActiveObjectOfType<SupplyTankUI>();
+            if (supplyTankPanel != null)
+            {
+                Traverse.Create(supplyTankPanel).Method("LinkRecipientBtnPressed").GetValue();
+                return;
+            }
+
+            BuildingPanelUI buildingPanel = FindActiveObjectOfType<BuildingPanelUI>();
+            if (buildingPanel != null)
+            {
+                Traverse.Create(buildingPanel).Method("AddCrane").GetValue();
+            }
         }
 
-        BuildingPanelUI buildingPanel = FindObjectOfType<BuildingPanelUI>();
-        if (buildingPanel != null)
+        if (WasPressed("AutoUpgrade"))
         {
-            Traverse.Create(buildingPanel).Method("AddCrane").GetValue();
-            return;
-        }
+            BuildingPanelUI buildingPanel = FindActiveObjectOfType<BuildingPanelUI>();
+            if (buildingPanel == null)
+                return;
 
-        HarvesterPadUI harvesterPanel = FindObjectOfType<HarvesterPadUI>();
-        if (harvesterPanel != null)
-        {
-            Traverse.Create(harvesterPanel).Method("LinkBuildingBtnPressed").GetValue();
-            return;
-        }
+            var t = Traverse.Create(buildingPanel);
+            if (!t.Field("_hasAutoUpgradeBehaviour").GetValue<bool>())
+                return;
 
-        SupplyTankUI supplyTankPanel = FindObjectOfType<SupplyTankUI>();
-        if (supplyTankPanel != null)
-        {
-            Traverse.Create(supplyTankPanel).Method("LinkRecipientBtnPressed").GetValue();
+            BuildingAutoUpgradeBehaviour autoUpgradeBehaviour = t.Field("_autoUpgradeBehaviour").GetValue<BuildingAutoUpgradeBehaviour>();
+            if (autoUpgradeBehaviour == null)
+                return;
+
+            Toggle toggle = t.Field("_autoUpgradeToggle").GetValue<Toggle>();
+            if (toggle != null)
+                toggle.isOn = !autoUpgradeBehaviour.AutoUpgrade;
+            else
+                buildingPanel.SetAutoUpgrade(!autoUpgradeBehaviour.AutoUpgrade);
         }
     }
 }

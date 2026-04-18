@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Data.Buildings;
 using Data.FactoryFloor.Buildings;
@@ -18,6 +17,7 @@ public sealed class SingleItemBeltEstimatedThroughput : ScriptMod
     {
         public int[] Requirements;
         public int[] AssignedCranes;
+        public int[] CraneIconCounts;
         public int CraneCount;
         public int OutputAmount;
         public double CraneItemsPerMinute;
@@ -39,6 +39,106 @@ public sealed class SingleItemBeltEstimatedThroughput : ScriptMod
         }
 
         return value.ToString("0.##");
+    }
+
+    private static int GetOutputAmount(BuildingBehaviour behaviour)
+    {
+        foreach (var output in behaviour.GetCurrentOutputs())
+        {
+            return output.Item2;
+        }
+
+        return 0;
+    }
+
+    private static double GetCraneItemsPerMinute(BuildingCranesBehaviour cranesBehaviour)
+    {
+        return (double)FactoryUpdater.Instance.GetUnscaledStepsPerSecond()
+            / cranesBehaviour.UpdateFrequency
+            * 60.0;
+    }
+
+    private static int[] BuildCraneIconCounts(BuildingBehaviour behaviour, int[] requirements)
+    {
+        int smallestAmount;
+        int smallestMultiplier = behaviour.GetSmallestMultiplier(out smallestAmount);
+        if (smallestAmount <= 0)
+        {
+            return new int[requirements.Length];
+        }
+
+        return requirements.Select(requirement => requirement * smallestMultiplier / smallestAmount).ToArray();
+    }
+
+    private static double CalculateMinCoverage(int[] craneIconCounts, int[] assignedCranes)
+    {
+        double minCoverage = double.MaxValue;
+        for (int i = 0; i < craneIconCounts.Length; i++)
+        {
+            if (craneIconCounts[i] <= 0)
+            {
+                continue;
+            }
+
+            minCoverage = Math.Min(minCoverage, (double)assignedCranes[i] / craneIconCounts[i]);
+        }
+
+        return minCoverage == double.MaxValue ? 0.0 : minCoverage;
+    }
+
+    private static string BuildDistributionText(EstimateData data)
+    {
+        double minCoverage = CalculateMinCoverage(data.CraneIconCounts, data.AssignedCranes);
+        int baseCoverage = (int)Math.Floor(minCoverage);
+        int[] baseAssignedCranes = data.CraneIconCounts.Select(count => count * baseCoverage).ToArray();
+        int leftoverCranes = Math.Max(0, data.CraneCount - baseAssignedCranes.Sum());
+        string baseAssignedTerms = string.Join(",", baseAssignedCranes.Select(count => $"<color=#C43939>{count}</color>"));
+        string distributionText = $"<color=#2AB1FF>{baseCoverage}x</color> ({baseAssignedTerms})";
+
+        if (leftoverCranes > 0)
+        {
+            distributionText += $" + <color=#C43939>{leftoverCranes}</color>";
+        }
+
+        return distributionText;
+    }
+
+    private static string BuildCraftingTimeExpression(EstimateData data)
+    {
+        return string.Join(",",
+            data.Requirements.Zip(data.AssignedCranes, (requirement, assigned) =>
+                $"<color=#2AB1FF>{requirement}</color>/<color=#C43939>{assigned}</color>"));
+    }
+
+    private static bool TryGetItemsPerShownCrane(EstimateData data, out double itemsPerShownCrane)
+    {
+        itemsPerShownCrane = 0.0;
+        bool foundValue = false;
+
+        for (int i = 0; i < data.Requirements.Length; i++)
+        {
+            int shownCranes = data.CraneIconCounts[i];
+            if (shownCranes <= 0)
+            {
+                continue;
+            }
+
+            double value = (double)data.Requirements[i] / shownCranes;
+            if (!foundValue)
+            {
+                itemsPerShownCrane = value;
+                foundValue = true;
+                continue;
+            }
+
+            if (Math.Abs(itemsPerShownCrane - value) > 1e-9)
+            {
+                itemsPerShownCrane = 0.0;
+                return false;
+            }
+        }
+
+        return foundValue;
     }
 
     private static int[] CalculateAssignments(int[] requirements, int craneCount, out double craftingTime, out bool isPossible)
@@ -114,20 +214,14 @@ public sealed class SingleItemBeltEstimatedThroughput : ScriptMod
             return false;
         }
 
-        int outputAmount = 0;
-        foreach (var output in behaviour.GetCurrentOutputs())
-        {
-            outputAmount = output.Item2;
-            break;
-        }
-
-        double craneItemsPerMinute = (double)FactoryUpdater.Instance.GetUnscaledStepsPerSecond()
-            / cranesBehaviour.UpdateFrequency
-            * 60.0;
+        int outputAmount = GetOutputAmount(behaviour);
+        double craneItemsPerMinute = GetCraneItemsPerMinute(cranesBehaviour);
 
         double craftingTime;
         bool isPossible;
-        int[] assignedCranes = CalculateAssignments(requirements, cranesBehaviour.Cranes.Count, out craftingTime, out isPossible);
+        int craneCount = cranesBehaviour.Cranes.Count;
+        int[] assignedCranes = CalculateAssignments(requirements, craneCount, out craftingTime, out isPossible);
+        int[] craneIconCounts = BuildCraneIconCounts(behaviour, requirements);
 
         double estimatedOutputPerMinute = 0.0;
         if (isPossible && outputAmount > 0 && craftingTime > 0.0)
@@ -139,7 +233,8 @@ public sealed class SingleItemBeltEstimatedThroughput : ScriptMod
         {
             Requirements = requirements,
             AssignedCranes = assignedCranes,
-            CraneCount = cranesBehaviour.Cranes.Count,
+            CraneIconCounts = craneIconCounts,
+            CraneCount = craneCount,
             OutputAmount = outputAmount,
             CraneItemsPerMinute = craneItemsPerMinute,
             CraftingTime = craftingTime,
@@ -164,19 +259,34 @@ public sealed class SingleItemBeltEstimatedThroughput : ScriptMod
                 data.CraneCount);
         }
 
-        string[] terms = new string[data.Requirements.Length];
-        for (int i = 0; i < data.Requirements.Length; i++)
+        string iconTerms = string.Join(",", data.CraneIconCounts.Select(c => $"<color=#2AB1FF>{c}</color>"));
+        string distributionText = BuildDistributionText(data);
+        double minCoverage = CalculateMinCoverage(data.CraneIconCounts, data.AssignedCranes);
+
+        double itemsPerShownCrane;
+        if (TryGetItemsPerShownCrane(data, out itemsPerShownCrane))
         {
-            terms[i] = string.Format(
-                "<color=#2AB1FF>{0}</color>/<color=#C43939>{1}</color>",
-                data.Requirements[i],
-                data.AssignedCranes[i]);
+            return string.Format(
+                "<color=#C43939>{0}</color> / ({1}) = {2}\n<color=#FFD926>{3}</color> * <color=#2AB1FF>{4}x</color> / <color=#C43939>{5}</color> * <color=#55C472>{6}</color> = {7}",
+                data.CraneCount,
+                iconTerms,
+                distributionText,
+                FormatNumber(data.CraneItemsPerMinute),
+                FormatNumber(minCoverage),
+                FormatNumber(itemsPerShownCrane),
+                data.OutputAmount,
+                FormatNumber(data.EstimatedOutputPerMinute));
         }
 
+        string craftingTimeTerms = BuildCraftingTimeExpression(data);
+
         return string.Format(
-            "<color=#FFD926>{0}</color> / max({1}) * <color=#55C472>{2}</color> = {3}",
+            "<color=#C43939>{0}</color> / ({1}) = {2}\n<color=#FFD926>{3}</color> / max({4}) * <color=#55C472>{5}</color> = {6}",
+            data.CraneCount,
+            iconTerms,
+            distributionText,
             FormatNumber(data.CraneItemsPerMinute),
-            string.Join(", ", terms),
+            craftingTimeTerms,
             data.OutputAmount,
             FormatNumber(data.EstimatedOutputPerMinute));
     }

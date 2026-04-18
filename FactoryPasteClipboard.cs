@@ -1,5 +1,6 @@
 using System;
 using System.Text;
+using Data.Operator;
 using HarmonyLib;
 using Logic.Factory;
 using Logic.Factory.Blueprint;
@@ -11,7 +12,6 @@ using SaveData.FactoryFloor;
 using ScriptEngine;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.InputSystem;
 using Utils.JsonConverterUtils;
 using Newtonsoft.Json;
 
@@ -27,6 +27,9 @@ public sealed class FactoryPasteClipboard : ScriptMod
     protected override void OnEnable()
     {
         _instance = this;
+        BindKey("Copy", "Ctrl+C");
+        BindKey("Paste", "V");
+        BindKey("PasteSystemClipboard", "Ctrl+V");
     }
 
     protected override void OnDisable()
@@ -43,16 +46,17 @@ public sealed class FactoryPasteClipboard : ScriptMod
         if (IsUiFocused())
             return;
 
-        var keyboard = Keyboard.current;
-        if (keyboard == null)
-            return;
-
-        var ctrlHeld = keyboard.leftCtrlKey.isPressed || keyboard.rightCtrlKey.isPressed;
-        if (ctrlHeld && keyboard.cKey.wasPressedThisFrame)
+        if (WasPressed("Copy"))
             TryCopySelectedToolToClipboard();
 
-        if (keyboard.vKey.wasPressedThisFrame)
-            TryPaste(preferSystemClipboard: ctrlHeld);
+        if (WasPressed("PasteSystemClipboard"))
+        {
+            TryPaste(preferSystemClipboard: true);
+            return;
+        }
+
+        if (WasPressed("Paste"))
+            TryPaste(preferSystemClipboard: false);
     }
 
     internal static bool TryCopySelectedToolToClipboard()

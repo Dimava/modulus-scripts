@@ -3,7 +3,6 @@ using Presentation.UI.OperatorUIs;
 using Presentation.UI.OperatorUIs.InsideOperatorUIs;
 using ScriptEngine;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 /// <summary>
 /// Press 1/2/3/4 while the cutter interior UI is open to select the matching cut interval.
@@ -14,33 +13,47 @@ using UnityEngine.InputSystem;
 [ScriptEntry]
 public sealed class CutterIntervalKeys : ScriptMod
 {
-    private static readonly Key[] IntervalKeys =
+    protected override void OnEnable()
     {
-        Key.Digit1,
-        Key.Digit2,
-        Key.Digit3,
-        Key.Digit4,
-    };
+        BindKey("CutInterval1", "1");
+        BindKey("CutInterval2", "2");
+        BindKey("CutInterval3", "3");
+        BindKey("CutInterval4", "4");
+        BindKey("Accept", "E");
+        BindKey("Reset", "Q");
+    }
 
     protected override void OnUpdate()
     {
-        if (Keyboard.current == null)
-            return;
-
-        CutterUIInterval interval = FindObjectOfType<CutterUIInterval>();
+        CutterUIInterval interval = FindActiveObjectOfType<CutterUIInterval>();
         if (interval != null)
         {
-            for (int i = 0; i < IntervalKeys.Length; i++)
+            if (WasPressed("CutInterval1"))
             {
-                if (Keyboard.current[IntervalKeys[i]].wasPressedThisFrame)
-                {
-                    TrySetInterval(interval, i + 1);
-                    return;
-                }
+                TrySetInterval(interval, 1);
+                return;
+            }
+
+            if (WasPressed("CutInterval2"))
+            {
+                TrySetInterval(interval, 2);
+                return;
+            }
+
+            if (WasPressed("CutInterval3"))
+            {
+                TrySetInterval(interval, 3);
+                return;
+            }
+
+            if (WasPressed("CutInterval4"))
+            {
+                TrySetInterval(interval, 4);
+                return;
             }
         }
 
-        if (Keyboard.current[Key.E].wasPressedThisFrame)
+        if (WasPressed("Accept"))
         {
             _ = TryPressButton<CutterUI>("_readyButton")
              || TryPressButton<AssemblerUI>("_readyButton")
@@ -48,7 +61,7 @@ public sealed class CutterIntervalKeys : ScriptMod
              || TryPressButton<StamperMK2UI>("_readyButton");
         }
 
-        if (Keyboard.current[Key.Q].wasPressedThisFrame)
+        if (WasPressed("Reset"))
         {
             _ = TryPressButton<CutterUI>("_resetButton")
              || TryPressButton<AssemblerUI>("_resetButton")
@@ -59,7 +72,7 @@ public sealed class CutterIntervalKeys : ScriptMod
 
     private static bool TryPressButton<T>(string buttonFieldName) where T : MonoBehaviour
     {
-        T ui = FindObjectOfType<T>();
+        T ui = FindActiveObjectOfType<T>();
         if (ui == null)
             return false;
 

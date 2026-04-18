@@ -21,7 +21,7 @@ public sealed class AssemblerMiddleClickPlace : ScriptMod
         if (Mouse.current == null) return;
         if (!Mouse.current.middleButton.wasPressedThisFrame) return;
 
-        var assemblerUI = FindObjectOfType<AssemblerUI>();
+        var assemblerUI = FindActiveObjectOfType<AssemblerUI>();
         if (assemblerUI == null || !assemblerUI.isActiveAndEnabled)
         {
             _ = TryPressReady<CutterUI>()
@@ -133,7 +133,7 @@ public sealed class AssemblerMiddleClickPlace : ScriptMod
 
     private static bool TryPressReady<T>() where T : MonoBehaviour
     {
-        T ui = FindObjectOfType<T>();
+        T ui = FindActiveObjectOfType<T>();
         if (ui == null)
             return false;
 
@@ -145,4 +145,6 @@ public sealed class AssemblerMiddleClickPlace : ScriptMod
         readyButton.OnPointerUp(null);
         return true;
     }
+
+
 }
