@@ -15,12 +15,12 @@ public sealed class CutterIntervalKeys : ScriptMod
 {
     protected override void OnEnable()
     {
-        BindKey("CutInterval1", "1");
-        BindKey("CutInterval2", "2");
-        BindKey("CutInterval3", "3");
-        BindKey("CutInterval4", "4");
-        BindKey("Accept", "E");
-        BindKey("Reset", "Q");
+        BindKey("keyCutInterval1", "1");
+        BindKey("keyCutInterval2", "2");
+        BindKey("keyCutInterval3", "3");
+        BindKey("keyCutInterval4", "4");
+        BindKey("keyAccept", "E");
+        BindKey("keyReset", "Q");
     }
 
     protected override void OnUpdate()
@@ -28,32 +28,32 @@ public sealed class CutterIntervalKeys : ScriptMod
         CutterUIInterval interval = FindActiveObjectOfType<CutterUIInterval>();
         if (interval != null)
         {
-            if (WasPressed("CutInterval1"))
+            if (WasPressed("keyCutInterval1"))
             {
                 TrySetInterval(interval, 1);
                 return;
             }
 
-            if (WasPressed("CutInterval2"))
+            if (WasPressed("keyCutInterval2"))
             {
                 TrySetInterval(interval, 2);
                 return;
             }
 
-            if (WasPressed("CutInterval3"))
+            if (WasPressed("keyCutInterval3"))
             {
                 TrySetInterval(interval, 3);
                 return;
             }
 
-            if (WasPressed("CutInterval4"))
+            if (WasPressed("keyCutInterval4"))
             {
                 TrySetInterval(interval, 4);
                 return;
             }
         }
 
-        if (WasPressed("Accept"))
+        if (WasPressed("keyAccept"))
         {
             _ = TryPressButton<CutterUI>("_readyButton")
              || TryPressButton<AssemblerUI>("_readyButton")
@@ -61,7 +61,7 @@ public sealed class CutterIntervalKeys : ScriptMod
              || TryPressButton<StamperMK2UI>("_readyButton");
         }
 
-        if (WasPressed("Reset"))
+        if (WasPressed("keyReset"))
         {
             _ = TryPressButton<CutterUI>("_resetButton")
              || TryPressButton<AssemblerUI>("_resetButton")

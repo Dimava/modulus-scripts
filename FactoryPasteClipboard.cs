@@ -27,9 +27,9 @@ public sealed class FactoryPasteClipboard : ScriptMod
     protected override void OnEnable()
     {
         _instance = this;
-        BindKey("Copy", "Ctrl+C");
-        BindKey("Paste", "V");
-        BindKey("PasteSystemClipboard", "Ctrl+V");
+        BindKey("keyCopy", "Ctrl+C");
+        BindKey("keyPaste", "V");
+        BindKey("keyPasteSystemClipboard", "Ctrl+V");
     }
 
     protected override void OnDisable()
@@ -46,16 +46,16 @@ public sealed class FactoryPasteClipboard : ScriptMod
         if (IsUiFocused())
             return;
 
-        if (WasPressed("Copy"))
+        if (WasPressed("keyCopy"))
             TryCopySelectedToolToClipboard();
 
-        if (WasPressed("PasteSystemClipboard"))
+        if (WasPressed("keyPasteSystemClipboard"))
         {
             TryPaste(preferSystemClipboard: true);
             return;
         }
 
-        if (WasPressed("Paste"))
+        if (WasPressed("keyPaste"))
             TryPaste(preferSystemClipboard: false);
     }
 

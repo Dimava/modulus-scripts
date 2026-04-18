@@ -14,9 +14,8 @@ using UnityEngine;
 using UnityEngine.UI;
 
 /// <summary>
-/// Press R while a Building panel is open      -> crane-placement mode (Add Crane button).
-/// Press R while a Harvester Pad panel is open -> link-building mode (Link Building button).
-/// Press R while a Supply Tank panel is open   -> link-recipient mode (Link Building button).
+/// Connect hotkey (default Q): Building panel -> crane placement; Harvester Pad -> link building;
+/// Supply Tank -> link recipient. Auto-upgrade hotkey (default U) toggles auto-upgrade when the building panel is open.
 ///
 /// Steal connection (harvester pads): if the target building is already linked to a different
 /// harvester pad, that link is silently removed so this harvester takes over.
@@ -32,13 +31,13 @@ public sealed class ConnectionHotkey : ScriptMod
 {
     protected override void OnEnable()
     {
-        BindKey("Connect", "Q");
-        BindKey("AutoUpgrade", "U");
+        BindKey("keyConnect", "Q");
+        BindKey("keyAutoUpgrade", "U");
     }
 
     protected override void OnUpdate()
     {
-        if (WasPressed("Connect"))
+        if (WasPressed("keyConnect"))
         {
             HarvesterPadUI harvesterPanel = FindActiveObjectOfType<HarvesterPadUI>();
             if (harvesterPanel != null)
@@ -61,7 +60,7 @@ public sealed class ConnectionHotkey : ScriptMod
             }
         }
 
-        if (WasPressed("AutoUpgrade"))
+        if (WasPressed("keyAutoUpgrade"))
         {
             BuildingPanelUI buildingPanel = FindActiveObjectOfType<BuildingPanelUI>();
             if (buildingPanel == null)
