@@ -1,4 +1,6 @@
 using System;
+using System.IO;
+using System.IO.Compression;
 using System.Text;
 using Data.Operator;
 using HarmonyLib;
@@ -20,6 +22,7 @@ public sealed class FactoryPasteClipboard : ScriptMod
 {
     private static FactoryPasteClipboard? _instance;
     private const string ClipboardPrefix = "modulus-blueprint:";
+    private const string ClipboardFormatDefault = "j1zu";
     private const string ClipboardBlueprintName = "Clipboard";
     private static Blueprint? _clipboard;
     private static string _clipboardLabel = "clipboard";
@@ -143,24 +146,8 @@ public sealed class FactoryPasteClipboard : ScriptMod
 
     static bool TryLoadBlueprintFromSystemClipboard()
     {
-        var clipboardText = GUIUtility.systemCopyBuffer;
-        if (string.IsNullOrWhiteSpace(clipboardText) || !clipboardText.StartsWith(ClipboardPrefix, StringComparison.Ordinal))
+        if (!TryReadBlueprintJsonFromSystemClipboard(out var json))
             return false;
-
-        var payload = clipboardText.Substring(ClipboardPrefix.Length);
-        if (string.IsNullOrWhiteSpace(payload))
-            return false;
-
-        string json;
-        try
-        {
-            json = Encoding.UTF8.GetString(Convert.FromBase64String(payload));
-        }
-        catch (Exception ex)
-        {
-            _instance?.Warn($"Failed to decode system clipboard blueprint: {ex.Message}");
-            return false;
-        }
 
         if (!SaveSystem.TryReadJson<BlueprintDto>(json, out var blueprintDto) || blueprintDto == null)
             return false;
@@ -188,7 +175,10 @@ public sealed class FactoryPasteClipboard : ScriptMod
         try
         {
             var dto = new BlueprintDto(blueprint, ClipboardBlueprintName, Color.white, -1);
-            GUIUtility.systemCopyBuffer = ClipboardPrefix + Convert.ToBase64String(Encoding.UTF8.GetBytes(SerializeBlueprintDto(dto)));
+            var json = SerializeBlueprintDto(dto);
+            _instance?.Log($"Clipboard JSON: {json}");
+            var compressed = DeflateUtf8(json);
+            GUIUtility.systemCopyBuffer = ClipboardPrefix + ClipboardFormatDefault + ":" + EncodeBase64Url(compressed);
             return true;
         }
         catch (Exception ex)
@@ -196,6 +186,90 @@ public sealed class FactoryPasteClipboard : ScriptMod
             _instance?.Warn($"Failed to write system clipboard blueprint: {ex.Message}");
             return false;
         }
+    }
+
+    static bool TryReadBlueprintJsonFromSystemClipboard(out string json)
+    {
+        json = string.Empty;
+
+        var clipboardText = GUIUtility.systemCopyBuffer;
+        if (string.IsNullOrWhiteSpace(clipboardText) || !clipboardText.StartsWith(ClipboardPrefix, StringComparison.Ordinal))
+            return false;
+
+        try
+        {
+            return TryDecodeClipboardJson(clipboardText, out json);
+        }
+        catch (Exception ex)
+        {
+            _instance?.Warn($"Failed to decode system clipboard blueprint: {ex.Message}");
+            return false;
+        }
+    }
+
+    static bool TryDecodeClipboardJson(string clipboardText, out string json)
+    {
+        json = string.Empty;
+
+        var encoded = clipboardText.Substring(ClipboardPrefix.Length);
+        var separatorIndex = encoded.IndexOf(':');
+        if (separatorIndex <= 0 || separatorIndex >= encoded.Length - 1)
+            return false;
+
+        var format = encoded.Substring(0, separatorIndex);
+        var payload = encoded.Substring(separatorIndex + 1);
+        if (string.IsNullOrWhiteSpace(format) || string.IsNullOrWhiteSpace(payload))
+            return false;
+
+        var data = Encoding.UTF8.GetBytes(payload);
+
+        if (format.IndexOf('u') >= 0)
+            data = DecodeBase64Flexible(payload);
+
+        if (format.IndexOf('z') >= 0)
+            data = Inflate(data);
+
+        if (format.Contains("j1", StringComparison.Ordinal))
+        {
+            json = Encoding.UTF8.GetString(data);
+            return true;
+        }
+
+        return false;
+    }
+
+    static byte[] Inflate(byte[] data)
+    {
+        using var input = new MemoryStream(data);
+        using var deflate = new DeflateStream(input, CompressionMode.Decompress);
+        using var output = new MemoryStream();
+        deflate.CopyTo(output);
+        return output.ToArray();
+    }
+
+    static byte[] DeflateUtf8(string text)
+    {
+        var input = Encoding.UTF8.GetBytes(text);
+        using var output = new MemoryStream();
+        using (var deflate = new DeflateStream(output, System.IO.Compression.CompressionLevel.Optimal, leaveOpen: true))
+            deflate.Write(input, 0, input.Length);
+        return output.ToArray();
+    }
+
+    static string EncodeBase64Url(byte[] data)
+    {
+        return Convert.ToBase64String(data)
+            .Replace('+', '-')
+            .Replace('/', '_');
+    }
+
+    static byte[] DecodeBase64Flexible(string text)
+    {
+        var normalized = text
+            .Replace('-', '+')
+            .Replace('_', '/');
+
+        return Convert.FromBase64String(normalized);
     }
 
     static string SerializeBlueprintDto(BlueprintDto blueprintDto)
