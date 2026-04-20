@@ -153,7 +153,6 @@ public sealed class MinimapFullscreenController : MonoBehaviour
         _scrollControls = minimapUI != null ? minimapUI.GetComponentInChildren<MinimapScrollViewControls>(includeInactive: true) : null;
         ResolveTargets();
         EnsureButton();
-        DumpDebugTree("setup");
     }
 
     private void Awake()
@@ -1122,6 +1121,5 @@ static class MinimapFullscreenButton_MinimapUI_ShowPanel_Patch
         }
 
         controller.Setup(__instance);
-        controller.DumpDebugTree("show-panel");
     }
 }

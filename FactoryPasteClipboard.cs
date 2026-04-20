@@ -54,12 +54,13 @@ public sealed class FactoryPasteClipboard : ScriptMod
 
         if (WasPressed("keyPasteSystemClipboard"))
         {
-            TryPaste(preferSystemClipboard: true);
+            TryLoadBlueprintFromSystemClipboard();
+            TryPasteFromModClipboard();
             return;
         }
 
         if (WasPressed("keyPaste"))
-            TryPaste(preferSystemClipboard: false);
+            TryPasteFromModClipboard();
     }
 
     internal static bool TryCopySelectedToolToClipboard()
@@ -78,11 +79,12 @@ public sealed class FactoryPasteClipboard : ScriptMod
         return StoreBlueprint(blueprint);
     }
 
-    internal static void TryPaste(bool preferSystemClipboard = false)
+    /// <summary>
+    /// Places from the mod's in-memory clipboard. Ctrl+V loads the OS clipboard into this buffer
+    /// without re-encoding it to the OS buffer, so the blueprint stays here for repeated V presses.
+    /// </summary>
+    internal static void TryPasteFromModClipboard()
     {
-        if (preferSystemClipboard)
-            TryLoadBlueprintFromSystemClipboard();
-
         if (_clipboard == null)
             return;
 
@@ -163,10 +165,24 @@ public sealed class FactoryPasteClipboard : ScriptMod
             return false;
 
         var blueprint = blueprintDto.CopyToBlueprint(factoryObjectDatabase);
-        if (!StoreBlueprint(blueprint))
+        if (!StoreBlueprintModOnly(blueprint))
             return false;
 
-        _instance?.Log($"Loaded from system clipboard: {_clipboardLabel}");
+        _instance?.Log($"Loaded from system clipboard: {_clipboardLabel} (press V to place again)");
+        return true;
+    }
+
+    /// <summary>
+    /// Keeps a blueprint in the mod clipboard only. Does not write <see cref="GUIUtility.systemCopyBuffer"/>,
+    /// so importing with Ctrl+V does not replace the user's OS clipboard and repeats reliably with V.
+    /// </summary>
+    static bool StoreBlueprintModOnly(Blueprint? blueprint)
+    {
+        if (blueprint == null || blueprint.Elements == null || blueprint.Elements.Count == 0)
+            return false;
+
+        _clipboard = blueprint.GetCopy();
+        _clipboardLabel = DescribeBlueprint(_clipboard);
         return true;
     }
 
@@ -176,7 +192,7 @@ public sealed class FactoryPasteClipboard : ScriptMod
         {
             var dto = new BlueprintDto(blueprint, ClipboardBlueprintName, Color.white, -1);
             var json = SerializeBlueprintDto(dto);
-            _instance?.Log($"Clipboard JSON: {json}");
+            // _instance?.Log($"Clipboard JSON: {json}");
             var compressed = DeflateUtf8(json);
             GUIUtility.systemCopyBuffer = ClipboardPrefix + ClipboardFormatDefault + ":" + EncodeBase64Url(compressed);
             return true;
@@ -192,13 +208,13 @@ public sealed class FactoryPasteClipboard : ScriptMod
     {
         json = string.Empty;
 
-        var clipboardText = GUIUtility.systemCopyBuffer;
-        if (string.IsNullOrWhiteSpace(clipboardText) || !clipboardText.StartsWith(ClipboardPrefix, StringComparison.Ordinal))
+        var clipboardText = GUIUtility.systemCopyBuffer?.Trim();
+        if (string.IsNullOrWhiteSpace(clipboardText) || !TryExtractUniqueBlueprintToken(clipboardText, out var blueprintToken))
             return false;
 
         try
         {
-            return TryDecodeClipboardJson(clipboardText, out json);
+            return TryDecodeClipboardJson(blueprintToken, out json);
         }
         catch (Exception ex)
         {
@@ -212,12 +228,12 @@ public sealed class FactoryPasteClipboard : ScriptMod
         json = string.Empty;
 
         var encoded = clipboardText.Substring(ClipboardPrefix.Length);
-        var separatorIndex = encoded.IndexOf(':');
-        if (separatorIndex <= 0 || separatorIndex >= encoded.Length - 1)
+        var parts = encoded.Split(':');
+        if (parts.Length < 2)
             return false;
 
-        var format = encoded.Substring(0, separatorIndex);
-        var payload = encoded.Substring(separatorIndex + 1);
+        var format = parts[0].Trim();
+        var payload = parts[^1].Trim();
         if (string.IsNullOrWhiteSpace(format) || string.IsNullOrWhiteSpace(payload))
             return false;
 
@@ -236,6 +252,26 @@ public sealed class FactoryPasteClipboard : ScriptMod
         }
 
         return false;
+    }
+
+    static bool TryExtractUniqueBlueprintToken(string clipboardText, out string blueprintToken)
+    {
+        blueprintToken = string.Empty;
+        var tokens = clipboardText.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        var matchCount = 0;
+
+        foreach (var token in tokens)
+        {
+            if (!token.StartsWith(ClipboardPrefix, StringComparison.Ordinal))
+                continue;
+
+            blueprintToken = token;
+            matchCount++;
+            if (matchCount > 1)
+                return false;
+        }
+
+        return matchCount == 1;
     }
 
     static byte[] Inflate(byte[] data)
