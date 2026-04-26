@@ -11,7 +11,7 @@ using UnityEngine.UI;
 [ScriptEntry]
 public sealed class CameraZoomLimitCap : ScriptMod
 {
-    internal const float SliderCap = 300f;
+    internal static int MaxZoom = 300;
 
     private static CameraZoomLimitCap _instance;
     private static bool _loggedCapRaise;
@@ -19,7 +19,18 @@ public sealed class CameraZoomLimitCap : ScriptMod
     protected override void OnEnable()
     {
         _instance = this;
-        Log($"Camera zoom modifier slider cap set to {SliderCap:0}.");
+        ReloadConfig();
+    }
+
+    protected override void OnConfigChanged()
+    {
+        ReloadConfig();
+    }
+
+    private void ReloadConfig()
+    {
+        MaxZoom = BindInt("MaxZoom", 300).Value;
+        Log($"Camera zoom modifier slider cap set to {MaxZoom}.");
     }
 
     protected override void OnDisable()
@@ -54,12 +65,12 @@ static class CameraZoomLimitCap_SettingsDisplay_InitMaxZoomLevelModifier_Patch
         }
 
         float oldMax = slider.maxValue;
-        if (oldMax >= CameraZoomLimitCap.SliderCap)
+        if (oldMax >= CameraZoomLimitCap.MaxZoom)
         {
             return;
         }
 
-        slider.maxValue = CameraZoomLimitCap.SliderCap;
+        slider.maxValue = CameraZoomLimitCap.MaxZoom;
         slider.wholeNumbers = true;
 
         MaxZoomLevelModifierSO zoomModifier = Traverse.Create(__instance).Field("_maxZoomLevelModifier").GetValue<MaxZoomLevelModifierSO>();
