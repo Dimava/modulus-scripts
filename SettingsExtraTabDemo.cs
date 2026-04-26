@@ -11,7 +11,7 @@ using UnityEngine.UI;
 
 // @Name: Settings ScriptEngine Tab
 // @Description: Adds a Settings tab with ScriptEngine mod enable toggles.
-// @Version: 1.1.0
+// @Version: 1.1.4
 // @Author: Dimava
 
 [ScriptEntry]
@@ -67,8 +67,7 @@ public sealed class SettingsExtraTabDemo : ScriptMod
 
         if (oldTabs == null || oldButtons == null || oldTabs.Length == 0 || oldButtons.Length == 0 || scrollRect == null)
         {
-            Warn("Settings tab injection skipped: menu fields were not ready.");
-            return;
+            throw new InvalidOperationException("Settings menu fields were not ready.");
         }
 
         oldTabs = oldTabs.Where(tab => tab != null && tab.name != TabObjectName).ToArray();
@@ -77,19 +76,40 @@ public sealed class SettingsExtraTabDemo : ScriptMod
         _templateText = menu.GetComponentsInChildren<TMP_Text>(true).FirstOrDefault(text => text != null);
 
         int tabIndex = oldTabs.Length;
-        GameObject tabObject = CreateTabContent(oldTabs[0]);
-        PageButton tabButton = CreateTabButton(oldButtons[oldButtons.Length - 1], tabIndex);
+        GameObject tabObject = null;
+        PageButton tabButton = null;
+        bool buttonHooked = false;
 
-        menuTraverse.Field("_tabs").SetValue(oldTabs.Concat(new[] { tabObject }).ToArray());
-        menuTraverse.Field("_tabButtons").SetValue(oldButtons.Concat(new[] { tabButton }).ToArray());
+        try
+        {
+            tabObject = CreateTabContent(oldTabs[0]);
+            tabButton = CreateTabButton(oldButtons[oldButtons.Length - 1], tabIndex);
 
-        tabObject.SetActive(false);
-        tabButton.ID = tabIndex;
-        tabButton.ActiveState = false;
-        tabButton.OnClick += OpenSettingsTab;
+            menuTraverse.Field("_tabs").SetValue(oldTabs.Concat(new[] { tabObject }).ToArray());
+            menuTraverse.Field("_tabButtons").SetValue(oldButtons.Concat(new[] { tabButton }).ToArray());
 
-        _injectedTabs.Add(new InjectedTab(menu, oldTabs, oldButtons, tabObject, tabButton, tabIndex));
-        Log("Injected Settings tab at index " + tabIndex + ".");
+            tabObject.SetActive(false);
+            tabButton.ID = tabIndex;
+            tabButton.ActiveState = false;
+            tabButton.OnClick += OpenSettingsTab;
+            buttonHooked = true;
+
+            _injectedTabs.Add(new InjectedTab(menu, oldTabs, oldButtons, tabObject, tabButton, tabIndex));
+        }
+        catch
+        {
+            if (buttonHooked && tabButton != null)
+            {
+                tabButton.OnClick -= OpenSettingsTab;
+            }
+
+            menuTraverse.Field("_tabs").SetValue(oldTabs);
+            menuTraverse.Field("_tabButtons").SetValue(oldButtons);
+            DestroyIfAlive(tabButton != null ? tabButton.gameObject : null);
+            DestroyIfAlive(tabObject);
+            RemoveOrphanObjects(menu);
+            throw;
+        }
     }
 
     private GameObject CreateTabContent(GameObject templateTab)
@@ -149,77 +169,166 @@ public sealed class SettingsExtraTabDemo : ScriptMod
 
     private void AddModToggle(Transform parent, ScriptModRecord info)
     {
-        var row = new GameObject("ModRow_" + SafeName(info.Id));
-        row.transform.SetParent(parent, false);
-
-        var rect = row.AddComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 1f);
-        rect.anchorMax = new Vector2(1f, 1f);
-        rect.pivot = new Vector2(0f, 1f);
-        rect.sizeDelta = new Vector2(0f, 36f);
-
-        var layout = row.AddComponent<HorizontalLayoutGroup>();
-        layout.childAlignment = TextAnchor.MiddleLeft;
-        layout.childControlWidth = false;
-        layout.childControlHeight = true;
-        layout.childForceExpandWidth = false;
-        layout.childForceExpandHeight = false;
-        layout.spacing = 10f;
-
-        var rowElement = row.AddComponent<LayoutElement>();
-        rowElement.preferredHeight = 36f;
-
-        Toggle toggle = CreateToggle(row.transform, info.Enabled.Value);
-        _toggles.Add(toggle);
-
-        TMP_Text label = AddText(row.transform, info.Id + (info.IsLoaded ? "  [loaded]" : ""), 18f, info.HasError ? FontStyles.Bold : FontStyles.Normal);
-        var labelElement = label.gameObject.GetComponent<LayoutElement>();
-        labelElement.preferredWidth = 850f;
-        labelElement.flexibleWidth = 1f;
-
-        if (info.HasError)
+        if (!TryAddVanillaModToggle(parent, info))
         {
-            label.color = Color.red;
+            throw new InvalidOperationException("Vanilla settings toggle template was not available for " + info.Id + ".");
+        }
+    }
+
+    private bool TryAddVanillaModToggle(Transform parent, ScriptModRecord info)
+    {
+        SettingsDisplay display = Resources.FindObjectsOfTypeAll<SettingsDisplay>().FirstOrDefault(item => item != null);
+        if (display == null)
+        {
+            return false;
         }
 
+        Component templateToggle = Traverse.Create(display).Field("_vSyncToggle").GetValue<Component>();
+        if (templateToggle == null)
+        {
+            return false;
+        }
+
+        Transform rowTemplate = FindRowRoot(display.transform, templateToggle.transform);
+        if (rowTemplate == null)
+        {
+            return false;
+        }
+
+        GameObject row = UnityEngine.Object.Instantiate(rowTemplate.gameObject, parent);
+        row.name = "ModRow_" + SafeName(info.Id);
+        row.SetActive(true);
+
+        Toggle oldToggle = row.GetComponentInChildren<Toggle>(true);
+        if (oldToggle == null)
+        {
+            DestroyIfAlive(row);
+            return false;
+        }
+
+        Transform editorRoot = FindEditorRoot(row.transform, oldToggle.transform);
+        ConfigureClonedRow(row.transform, editorRoot, info);
+        NormalizeClonedToggleRow(row, editorRoot);
+
+        Toggle toggle = ReplaceToggle(oldToggle);
+        toggle.SetIsOnWithoutNotify(info.Enabled.Value);
         toggle.onValueChanged.AddListener(value =>
         {
             info.Enabled.Value = value;
-            Log((value ? "Enabled " : "Disabled ") + info.Id);
         });
+
+        _toggles.Add(toggle);
+        return true;
     }
 
-    private Toggle CreateToggle(Transform parent, bool value)
+    private static Toggle ReplaceToggle(Toggle oldToggle)
     {
-        var go = new GameObject("Enabled");
-        go.transform.SetParent(parent, false);
+        Graphic targetGraphic = oldToggle.targetGraphic;
+        Graphic graphic = oldToggle.graphic;
+        Navigation navigation = oldToggle.navigation;
+        Selectable.Transition transition = oldToggle.transition;
+        ColorBlock colors = oldToggle.colors;
+        SpriteState spriteState = oldToggle.spriteState;
+        AnimationTriggers animationTriggers = oldToggle.animationTriggers;
+        bool interactable = oldToggle.interactable;
+        GameObject go = oldToggle.gameObject;
 
-        var rect = go.AddComponent<RectTransform>();
-        rect.sizeDelta = new Vector2(28f, 28f);
+        UnityEngine.Object.DestroyImmediate(oldToggle);
 
-        var image = go.AddComponent<Image>();
-        image.color = new Color(0.1f, 0.12f, 0.14f, 0.95f);
-
-        var toggle = go.AddComponent<Toggle>();
-        toggle.targetGraphic = image;
-
-        var checkGo = new GameObject("Checkmark");
-        checkGo.transform.SetParent(go.transform, false);
-        var checkRect = checkGo.AddComponent<RectTransform>();
-        checkRect.anchorMin = new Vector2(0.2f, 0.2f);
-        checkRect.anchorMax = new Vector2(0.8f, 0.8f);
-        checkRect.offsetMin = Vector2.zero;
-        checkRect.offsetMax = Vector2.zero;
-        var checkImage = checkGo.AddComponent<Image>();
-        checkImage.color = new Color(0.1f, 0.85f, 0.45f, 1f);
-        toggle.graphic = checkImage;
-        toggle.SetIsOnWithoutNotify(value);
-
-        var element = go.AddComponent<LayoutElement>();
-        element.preferredWidth = 28f;
-        element.preferredHeight = 28f;
-
+        Toggle toggle = go.AddComponent<Toggle>();
+        toggle.targetGraphic = targetGraphic;
+        toggle.graphic = graphic;
+        toggle.navigation = navigation;
+        toggle.transition = transition;
+        toggle.colors = colors;
+        toggle.spriteState = spriteState;
+        toggle.animationTriggers = animationTriggers;
+        toggle.interactable = interactable;
         return toggle;
+    }
+
+    private static void ConfigureClonedRow(Transform rowRoot, Transform editorRoot, ScriptModRecord info)
+    {
+        foreach (LocalizedTMPText localizedText in rowRoot.GetComponentsInChildren<LocalizedTMPText>(true))
+        {
+            localizedText.enabled = false;
+        }
+
+        foreach (LocalizedText localizedText in rowRoot.GetComponentsInChildren<LocalizedText>(true))
+        {
+            localizedText.enabled = false;
+        }
+
+        List<TMP_Text> texts = rowRoot
+            .GetComponentsInChildren<TMP_Text>(true)
+            .Where(text => text != null && (editorRoot == null || !text.transform.IsChildOf(editorRoot)))
+            .ToList();
+
+        if (texts.Count == 0)
+        {
+            return;
+        }
+
+        texts[0].text = info.Id + (info.IsLoaded ? "  [loaded]" : "");
+        if (info.HasError)
+        {
+            texts[0].color = Color.red;
+            texts[0].fontStyle = texts[0].fontStyle | FontStyles.Bold;
+        }
+
+        for (int i = 1; i < texts.Count; i++)
+        {
+            texts[i].gameObject.SetActive(false);
+        }
+    }
+
+    private static void NormalizeClonedToggleRow(GameObject row, Transform editorRoot)
+    {
+        LayoutElement element = row.GetComponent<LayoutElement>() ?? row.AddComponent<LayoutElement>();
+        element.flexibleWidth = 1f;
+        element.minHeight = 64f;
+        element.preferredHeight = 64f;
+
+        RectTransform rowRt = row.transform as RectTransform;
+        if (rowRt != null)
+        {
+            rowRt.anchorMin = new Vector2(0f, rowRt.anchorMin.y);
+            rowRt.anchorMax = new Vector2(1f, rowRt.anchorMax.y);
+            rowRt.sizeDelta = new Vector2(0f, rowRt.sizeDelta.y);
+        }
+
+        RectTransform editorRt = editorRoot as RectTransform;
+        if (editorRt == null)
+        {
+            return;
+        }
+
+        editorRt.anchorMin = new Vector2(0.30f, editorRt.anchorMin.y);
+        editorRt.anchorMax = new Vector2(1f, editorRt.anchorMax.y);
+        editorRt.offsetMin = new Vector2(16f, editorRt.offsetMin.y);
+        editorRt.offsetMax = new Vector2(-6f, editorRt.offsetMax.y);
+    }
+
+    private static Transform FindRowRoot(Transform displayRoot, Transform control)
+    {
+        Transform current = control;
+        while (current != null && current.parent != null && current.parent != displayRoot)
+        {
+            current = current.parent;
+        }
+
+        return current;
+    }
+
+    private static Transform FindEditorRoot(Transform rowRoot, Transform control)
+    {
+        Transform current = control;
+        while (current != null && current.parent != null && current.parent != rowRoot)
+        {
+            current = current.parent;
+        }
+
+        return current;
     }
 
     private PageButton CreateTabButton(PageButton template, int tabIndex)
