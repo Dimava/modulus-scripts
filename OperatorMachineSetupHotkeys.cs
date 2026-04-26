@@ -11,7 +11,7 @@ using UnityEngine;
 /// Press Q to reset in any of those UIs - only when the Reset button is interactable.
 /// </summary>
 [ScriptEntry]
-public sealed class CutterIntervalKeys : ScriptMod
+public sealed class OperatorMachineSetupHotkeys : ScriptMod
 {
     protected override void OnEnable()
     {

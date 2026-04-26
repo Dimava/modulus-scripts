@@ -16,7 +16,7 @@ using UnityEngine;
 /// method body runs as if no animation was in progress.
 /// </summary>
 [ScriptEntry]
-public sealed class CutterRotateInstant : ScriptMod
+public sealed class InstantShapeRotation : ScriptMod
 {
     /// <summary>
     /// If a rotation animation is currently running, complete it immediately
@@ -61,7 +61,7 @@ static class ShapeLoader_RotateShapeXAnimated_Patch
 {
     static void Prefix(ShapeLoader __instance)
     {
-        CutterRotateInstant.FlushAnimation(__instance);
+        InstantShapeRotation.FlushAnimation(__instance);
     }
 }
 
@@ -70,6 +70,6 @@ static class ShapeLoader_RotateShapeYAnimated_Patch
 {
     static void Prefix(ShapeLoader __instance)
     {
-        CutterRotateInstant.FlushAnimation(__instance);
+        InstantShapeRotation.FlushAnimation(__instance);
     }
 }

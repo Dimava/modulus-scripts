@@ -18,9 +18,9 @@ using Utils.JsonConverterUtils;
 using Newtonsoft.Json;
 
 [ScriptEntry]
-public sealed class FactoryPasteClipboard : ScriptMod
+public sealed class BlueprintClipboardCopyPaste : ScriptMod
 {
-    private static FactoryPasteClipboard? _instance;
+    private static BlueprintClipboardCopyPaste? _instance;
     private const string ClipboardPrefix = "modulus-blueprint:";
     private const string ClipboardFormatDefault = "j1zu";
     private const string ClipboardBlueprintName = "Clipboard";
@@ -356,6 +356,6 @@ static class DuplicateTool_ImplementedSelectTool_Patch
 {
     static void Postfix(DuplicateTool __instance)
     {
-        FactoryPasteClipboard.AutoCopySelection(__instance, "duplicate");
+        BlueprintClipboardCopyPaste.AutoCopySelection(__instance, "duplicate");
     }
 }

@@ -16,7 +16,7 @@ using UnityEngine;
 // Rate changes (e.g. 30->45): short window reflects the new rate within ~SHORT_SECS seconds
 // while long window lags; delta grows -> display tracks the short window quickly.
 [ScriptEntry]
-public sealed class CounterDualWindow : ScriptMod
+public sealed class StableCounterRateDisplay : ScriptMod
 {
     public const int SHORT_SECS = 20;
     public const float BLEND_THRESHOLD = 8f;
@@ -48,8 +48,8 @@ static class CounterBehaviour_Update_DualWindow_Patch
             trav.Field("_counter").SetValue(0);
             trav.Field("_histogram").GetValue<Queue<bool>>().Clear();
             trav.Field("_outputResourceSuccessfully").SetValue(true);
-            CounterDualWindow.ShortState state;
-            if (CounterDualWindow.States.TryGetValue(__instance, out state))
+            StableCounterRateDisplay.ShortState state;
+            if (StableCounterRateDisplay.States.TryGetValue(__instance, out state))
             {
                 state.Hist.Clear();
                 state.Count = 0;
@@ -62,7 +62,7 @@ static class CounterBehaviour_Update_DualWindow_Patch
         int stepsPerSec = FactoryUpdater.Instance.GetStepsPerSecond();
         int updateFreq = __instance.UpdateFrequency;
         int longLen = stepsPerSec * 120 / updateFreq;
-        int shortLen = stepsPerSec * CounterDualWindow.SHORT_SECS / updateFreq;
+        int shortLen = stepsPerSec * StableCounterRateDisplay.SHORT_SECS / updateFreq;
         shortLen = Mathf.Max(shortLen, 1);
 
         bool inputFull = trav.Method("IsInputBufferFull", new object[] { 0 }).GetValue<bool>();
@@ -77,18 +77,18 @@ static class CounterBehaviour_Update_DualWindow_Patch
             if (longHist.Dequeue()) longCounter--;
         trav.Field("_counter").SetValue(longCounter);
 
-        if (!CounterDualWindow.States.ContainsKey(__instance))
-            CounterDualWindow.States[__instance] = new CounterDualWindow.ShortState();
-        CounterDualWindow.ShortState shortState = CounterDualWindow.States[__instance];
+        if (!StableCounterRateDisplay.States.ContainsKey(__instance))
+            StableCounterRateDisplay.States[__instance] = new StableCounterRateDisplay.ShortState();
+        StableCounterRateDisplay.ShortState shortState = StableCounterRateDisplay.States[__instance];
         shortState.Hist.Enqueue(passed);
         if (passed) shortState.Count++;
         while (shortState.Hist.Count > shortLen)
             if (shortState.Hist.Dequeue()) shortState.Count--;
 
         float longDisplay = longCounter;
-        float shortDisplay = shortState.Count * 120f / CounterDualWindow.SHORT_SECS;
+        float shortDisplay = shortState.Count * 120f / StableCounterRateDisplay.SHORT_SECS;
         float delta = Mathf.Abs(shortDisplay - longDisplay);
-        float blend = Mathf.Clamp01(delta / CounterDualWindow.BLEND_THRESHOLD);
+        float blend = Mathf.Clamp01(delta / StableCounterRateDisplay.BLEND_THRESHOLD);
         float display = Mathf.Lerp(longDisplay, shortDisplay, blend);
 
         __instance.OnCounterUpdated.Fire(display);
@@ -115,17 +115,17 @@ static class CounterBehaviour_ApplySaveState_DualWindow_Patch
         int updateFreq = __instance.UpdateFrequency;
         if (updateFreq <= 0 || stepsPerSec <= 0) return;
 
-        int shortLen = Mathf.Max(stepsPerSec * CounterDualWindow.SHORT_SECS / updateFreq, 1);
+        int shortLen = Mathf.Max(stepsPerSec * StableCounterRateDisplay.SHORT_SECS / updateFreq, 1);
         var arr = longHist.ToArray();
         int start = Mathf.Max(0, arr.Length - shortLen);
 
-        var state = new CounterDualWindow.ShortState();
+        var state = new StableCounterRateDisplay.ShortState();
         for (int i = start; i < arr.Length; i++)
         {
             state.Hist.Enqueue(arr[i]);
             if (arr[i]) state.Count++;
         }
-        CounterDualWindow.States[__instance] = state;
+        StableCounterRateDisplay.States[__instance] = state;
     }
 }
 
@@ -134,6 +134,6 @@ static class CounterBehaviour_UnInit_DualWindow_Patch
 {
     static void Postfix(CounterBehaviour __instance)
     {
-        CounterDualWindow.States.Remove(__instance);
+        StableCounterRateDisplay.States.Remove(__instance);
     }
 }

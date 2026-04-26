@@ -8,9 +8,9 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 [ScriptEntry]
-public sealed class ToolbarShortcutRemap : ScriptMod
+public sealed class ToolbarGroupedShortcutFixes : ScriptMod
 {
-    private static ToolbarShortcutRemap _instance;
+    private static ToolbarGroupedShortcutFixes _instance;
 
     private static readonly Dictionary<string, string> BreadcrumbToTargetAction = new Dictionary<string, string>(StringComparer.Ordinal)
     {
@@ -390,16 +390,16 @@ public sealed class ToolbarShortcutRemap : ScriptMod
 }
 
 [HarmonyPatch(typeof(ToolBarButtonShortcut), nameof(ToolBarButtonShortcut.Init))]
-static class ToolbarShortcutRemap_ToolBarButtonShortcut_Init_Patch
+static class ToolbarGroupedShortcutFixes_ToolBarButtonShortcut_Init_Patch
 {
     static void Prefix(ToolBarButtonShortcut __instance)
     {
-        ToolbarShortcutRemap.RemapShortcutAction(__instance);
+        ToolbarGroupedShortcutFixes.RemapShortcutAction(__instance);
     }
 
     static void Postfix(ToolBarButtonShortcut __instance)
     {
-        ToolbarShortcutRemap.NormalizeShortcutGroup(__instance);
+        ToolbarGroupedShortcutFixes.NormalizeShortcutGroup(__instance);
     }
 }
 
@@ -408,7 +408,7 @@ static class ToolbarShortcutRemap_ToolBarButtonShortcut_Init_Patch
 // button is set (via SetLastPressedButton), immediately reset all OTHER groups back
 // to index 0 so their GUI reflects the first item.
 [HarmonyPatch(typeof(ToolBarButtonGroupsSO), nameof(ToolBarButtonGroupsSO.SetLastPressedButton))]
-static class ToolbarShortcutRemap_ToolBarButtonGroupsSO_SetLastPressedButton_Patch
+static class ToolbarGroupedShortcutFixes_ToolBarButtonGroupsSO_SetLastPressedButton_Patch
 {
     [ThreadStatic]
     private static bool _resetting;

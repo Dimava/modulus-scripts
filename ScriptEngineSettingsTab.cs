@@ -15,13 +15,13 @@ using UnityEngine.UI;
 // @Author: Dimava
 
 [ScriptEntry]
-public sealed class SettingsExtraTabDemo : ScriptMod
+public sealed class ScriptEngineSettingsTab : ScriptMod
 {
     private const string TabObjectName = "TabScriptEngine_Injected";
     private const string TabButtonName = "SettingsTabScriptEngine_Injected";
     private const string RowsObjectName = "ScriptEngineRows";
 
-    internal static SettingsExtraTabDemo Instance;
+    internal static ScriptEngineSettingsTab Instance;
 
     private readonly List<InjectedTab> _injectedTabs = new List<InjectedTab>();
     private readonly List<Toggle> _toggles = new List<Toggle>();
@@ -543,10 +543,10 @@ public sealed class SettingsExtraTabDemo : ScriptMod
 }
 
 [HarmonyPatch(typeof(SettingsMenu), "Awake")]
-static class SettingsExtraTabDemo_SettingsMenu_Awake_Patch
+static class ScriptEngineSettingsTab_SettingsMenu_Awake_Patch
 {
     static void Postfix()
     {
-        SettingsExtraTabDemo.Instance?.InjectAll();
+        ScriptEngineSettingsTab.Instance?.InjectAll();
     }
 }

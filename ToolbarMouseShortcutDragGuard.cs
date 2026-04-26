@@ -15,11 +15,11 @@ using UnityEngine.UI;
 /// <see cref="ToolSystem"/> cancel-click (read from the first live <c>ToolSystem</c> when possible).
 /// </summary>
 [ScriptEntry]
-public sealed class ButtonShortCutDragGate : ScriptMod
+public sealed class ToolbarMouseShortcutDragGuard : ScriptMod
 {
 }
 
-static class ButtonShortCutDragGateImpl
+static class ToolbarMouseShortcutDragGuardImpl
 {
     internal static readonly object GateLock = new();
 
@@ -100,15 +100,15 @@ static class ButtonShortCut_Init_SubscribeStartedPatch
         if (button == null || iar?.action == null)
             return;
 
-        lock (ButtonShortCutDragGateImpl.GateLock)
+        lock (ToolbarMouseShortcutDragGuardImpl.GateLock)
         {
-            if (ButtonShortCutDragGateImpl.Subs.ContainsKey(__instance))
+            if (ToolbarMouseShortcutDragGuardImpl.Subs.ContainsKey(__instance))
                 return;
 
             InputAction action = iar.action;
-            void OnStarted(InputAction.CallbackContext _) => ButtonShortCutDragGateImpl.RecordStart(__instance);
+            void OnStarted(InputAction.CallbackContext _) => ToolbarMouseShortcutDragGuardImpl.RecordStart(__instance);
             action.started += OnStarted;
-            ButtonShortCutDragGateImpl.Subs[__instance] = new ButtonShortCutDragGateImpl.Subscription(action, OnStarted);
+            ToolbarMouseShortcutDragGuardImpl.Subs[__instance] = new ToolbarMouseShortcutDragGuardImpl.Subscription(action, OnStarted);
         }
     }
 }
@@ -118,15 +118,15 @@ static class ButtonShortCut_OnDestroy_UnsubscribeStartedPatch
 {
     static void Postfix(ButtonShortCut __instance)
     {
-        lock (ButtonShortCutDragGateImpl.GateLock)
+        lock (ToolbarMouseShortcutDragGuardImpl.GateLock)
         {
-            if (ButtonShortCutDragGateImpl.Subs.TryGetValue(__instance, out var sub))
+            if (ToolbarMouseShortcutDragGuardImpl.Subs.TryGetValue(__instance, out var sub))
             {
                 sub.Action.started -= sub.StartedHandler;
-                ButtonShortCutDragGateImpl.Subs.Remove(__instance);
+                ToolbarMouseShortcutDragGuardImpl.Subs.Remove(__instance);
             }
 
-            ButtonShortCutDragGateImpl.Snaps.Remove(__instance);
+            ToolbarMouseShortcutDragGuardImpl.Snaps.Remove(__instance);
         }
     }
 }
@@ -140,29 +140,29 @@ static class ButtonShortCut_ActionPerformed_DragGatePatch
         if (button == null || !button.interactable)
             return false;
 
-        if (!ButtonShortCutDragGateImpl.IsPointerLikeDevice(obj))
+        if (!ToolbarMouseShortcutDragGuardImpl.IsPointerLikeDevice(obj))
         {
             button.onClick.Invoke();
             return false;
         }
 
-        ButtonShortCutDragGateImpl.EnsureThresholds();
+        ToolbarMouseShortcutDragGuardImpl.EnsureThresholds();
 
         (Vector2 pos, DateTime utc) snap;
-        lock (ButtonShortCutDragGateImpl.GateLock)
+        lock (ToolbarMouseShortcutDragGuardImpl.GateLock)
         {
-            if (!ButtonShortCutDragGateImpl.Snaps.TryGetValue(__instance, out snap))
+            if (!ToolbarMouseShortcutDragGuardImpl.Snaps.TryGetValue(__instance, out snap))
             {
                 button.onClick.Invoke();
                 return false;
             }
         }
 
-        Vector2 cur = ButtonShortCutDragGateImpl.ReadScreenPointer();
+        Vector2 cur = ToolbarMouseShortcutDragGuardImpl.ReadScreenPointer();
         float dist = Vector2.Distance(cur, snap.pos);
         double held = (DateTime.UtcNow - snap.utc).TotalSeconds;
 
-        bool clickLike = dist <= ButtonShortCutDragGateImpl.MaxMovePx && held <= ButtonShortCutDragGateImpl.MaxHoldSec;
+        bool clickLike = dist <= ToolbarMouseShortcutDragGuardImpl.MaxMovePx && held <= ToolbarMouseShortcutDragGuardImpl.MaxHoldSec;
         if (!clickLike)
             return false;
 

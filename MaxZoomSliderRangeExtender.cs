@@ -9,11 +9,11 @@ using UnityEngine.UI;
 /// The base camera already supports larger modifier values; this exposes more range.
 /// </summary>
 [ScriptEntry]
-public sealed class CameraZoomLimitCap : ScriptMod
+public sealed class MaxZoomSliderRangeExtender : ScriptMod
 {
     internal static int MaxZoom = 300;
 
-    private static CameraZoomLimitCap _instance;
+    private static MaxZoomSliderRangeExtender _instance;
     private static bool _loggedCapRaise;
 
     protected override void OnEnable()
@@ -54,7 +54,7 @@ public sealed class CameraZoomLimitCap : ScriptMod
 }
 
 [HarmonyPatch(typeof(SettingsDisplay), "InitMaxZoomLevelModifier")]
-static class CameraZoomLimitCap_SettingsDisplay_InitMaxZoomLevelModifier_Patch
+static class MaxZoomSliderRangeExtender_SettingsDisplay_InitMaxZoomLevelModifier_Patch
 {
     static void Postfix(SettingsDisplay __instance)
     {
@@ -65,12 +65,12 @@ static class CameraZoomLimitCap_SettingsDisplay_InitMaxZoomLevelModifier_Patch
         }
 
         float oldMax = slider.maxValue;
-        if (oldMax >= CameraZoomLimitCap.MaxZoom)
+        if (oldMax >= MaxZoomSliderRangeExtender.MaxZoom)
         {
             return;
         }
 
-        slider.maxValue = CameraZoomLimitCap.MaxZoom;
+        slider.maxValue = MaxZoomSliderRangeExtender.MaxZoom;
         slider.wholeNumbers = true;
 
         MaxZoomLevelModifierSO zoomModifier = Traverse.Create(__instance).Field("_maxZoomLevelModifier").GetValue<MaxZoomLevelModifierSO>();
@@ -79,6 +79,6 @@ static class CameraZoomLimitCap_SettingsDisplay_InitMaxZoomLevelModifier_Patch
             slider.SetValueWithoutNotify(zoomModifier.Value);
         }
 
-        CameraZoomLimitCap.MaybeLogCapRaise(oldMax, slider.maxValue);
+        MaxZoomSliderRangeExtender.MaybeLogCapRaise(oldMax, slider.maxValue);
     }
 }

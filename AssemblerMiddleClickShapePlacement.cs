@@ -14,7 +14,7 @@ using Utils;
 ///                                  position it relative to what's already there.
 /// </summary>
 [ScriptEntry]
-public sealed class AssemblerMiddleClickPlace : ScriptMod
+public sealed class AssemblerMiddleClickShapePlacement : ScriptMod
 {
     protected override void OnUpdate()
     {

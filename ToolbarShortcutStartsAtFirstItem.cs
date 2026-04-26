@@ -16,7 +16,7 @@ using UnityEngine.InputSystem;
 /// to index 1, and so on — same as vanilla.
 /// </summary>
 [ScriptEntry]
-public sealed class FirstBuildingTypeOnShortcut : ScriptMod
+public sealed class ToolbarShortcutStartsAtFirstItem : ScriptMod
 {
 }
 

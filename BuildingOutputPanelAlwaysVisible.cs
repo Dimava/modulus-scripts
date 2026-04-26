@@ -9,12 +9,12 @@ using UnityEngine;
 /// a building is under initial construction (stage 0) or upgrading.
 /// </summary>
 [ScriptEntry]
-public sealed class BuildingAlwaysShowOutput : ScriptMod { }
+public sealed class BuildingOutputPanelAlwaysVisible : ScriptMod { }
 
 // During stage 0 the whole _fullOutputContainer is hidden. Force it visible
 // whenever the building has an output resource defined.
 [HarmonyPatch(typeof(BuildingPanelUI), "UpdateOutput")]
-static class BuildingAlwaysShowOutput_UpdateOutput_Patch
+static class BuildingOutputPanelAlwaysVisible_UpdateOutput_Patch
 {
     static void Postfix(BuildingPanelUI __instance)
     {
@@ -29,7 +29,7 @@ static class BuildingAlwaysShowOutput_UpdateOutput_Patch
 // During upgrading, _estimatedOutputPanel is hidden and the text update is
 // skipped. Briefly clear _isUpgrading so the method runs normally.
 [HarmonyPatch(typeof(BuildingPanelUI), "UpdateOutputEstimates")]
-static class BuildingAlwaysShowOutput_UpdateOutputEstimates_Patch
+static class BuildingOutputPanelAlwaysVisible_UpdateOutputEstimates_Patch
 {
     static void Prefix(BuildingPanelUI __instance, out bool __state)
     {

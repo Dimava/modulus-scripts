@@ -12,4 +12,4 @@ Personal gameplay scripts for Modulus, intended to run through `ScriptEngine`.
 
 - Per-script enable flags and keybindings are stored in `Scripts/ScriptEngine.cfg`.
 - Several scripts define configurable hotkeys through the ScriptEngine UI or config file.
-- `CameraHorizontalMirror.cs` mirrors relative to the current main camera yaw.
+- `CameraRelativeMirrorRotation.cs` mirrors relative to the current main camera yaw.

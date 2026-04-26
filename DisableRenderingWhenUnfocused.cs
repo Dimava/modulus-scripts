@@ -7,7 +7,7 @@ using UnityEngine.Rendering;
 /// Keeps the game updating while unfocused, but suppresses scene/UI rendering until focus returns.
 /// </summary>
 [ScriptEntry]
-public sealed class UnfocusedNoRender : ScriptMod
+public sealed class DisableRenderingWhenUnfocused : ScriptMod
 {
     private const int BackgroundRenderFrameInterval = 1000;
     private const float BackgroundSweepIntervalSeconds = 0.5f;

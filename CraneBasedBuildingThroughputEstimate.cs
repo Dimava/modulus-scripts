@@ -12,7 +12,7 @@ using ScriptEngine;
 using UnityEngine;
 
 [ScriptEntry]
-public sealed class SingleItemBeltEstimatedThroughput : ScriptMod
+public sealed class CraneBasedBuildingThroughputEstimate : ScriptMod
 {
     public sealed class EstimateData
     {
@@ -349,7 +349,7 @@ static class BuildingCranesBehaviour_MaxAmountOfCranes_Patch
 {
     static bool Prefix(BuildingCranesBehaviour __instance, ref int __result)
     {
-        __result = SingleItemBeltEstimatedThroughput.GetActualCraneLimit(__instance);
+        __result = CraneBasedBuildingThroughputEstimate.GetActualCraneLimit(__instance);
         return false;
     }
 }
@@ -366,8 +366,8 @@ static class BuildingBehaviour_CalculateEstimatedOutputSpeed_Patch
             return false;
         }
 
-        SingleItemBeltEstimatedThroughput.EstimateData data;
-        if (!SingleItemBeltEstimatedThroughput.TryBuildEstimate(__instance, cranesBehaviour, out data) || data == null)
+        CraneBasedBuildingThroughputEstimate.EstimateData data;
+        if (!CraneBasedBuildingThroughputEstimate.TryBuildEstimate(__instance, cranesBehaviour, out data) || data == null)
         {
             __result = 0.0;
             return false;
@@ -408,16 +408,16 @@ static class BuildingPanelUI_UpdateOutputEstimates_Patch
             return false;
         }
 
-        SingleItemBeltEstimatedThroughput.EstimateData data;
-        if (!SingleItemBeltEstimatedThroughput.TryBuildEstimate(behaviour, cranesBehaviour, out data) || data == null)
+        CraneBasedBuildingThroughputEstimate.EstimateData data;
+        if (!CraneBasedBuildingThroughputEstimate.TryBuildEstimate(behaviour, cranesBehaviour, out data) || data == null)
         {
             estimatedOutputText.SetArguments("0");
             estimatedOutputHoverTextPanel.UpdateContent(estimatedOutputHoverLocaKey, "Estimate = 0");
             return false;
         }
 
-        string estimateText = SingleItemBeltEstimatedThroughput.FormatNumber(data.EstimatedOutputPerMinute);
-        string formulaText = SingleItemBeltEstimatedThroughput.BuildFormulaText(data);
+        string estimateText = CraneBasedBuildingThroughputEstimate.FormatNumber(data.EstimatedOutputPerMinute);
+        string formulaText = CraneBasedBuildingThroughputEstimate.BuildFormulaText(data);
 
         estimatedOutputText.SetArguments(estimateText);
         estimatedOutputHoverTextPanel.UpdateContent(estimatedOutputHoverLocaKey, formulaText);

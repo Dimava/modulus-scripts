@@ -6,7 +6,7 @@ using UnityEngine;
 
 /// <summary>After mirror, +180° when <see cref="IsEven"/> for camera yaw XOR <see cref="IsEven"/> for blueprint yaw.</summary>
 [ScriptEntry]
-public sealed class CameraHorizontalMirror : ScriptMod
+public sealed class CameraRelativeMirrorRotation : ScriptMod
 {
     /// <summary>True when <see cref="Mathf.Repeat"/>(yaw, 180) lies in [45, 135] (the 90°/270° ±45° windows folded mod 180).</summary>
     public static bool IsEven(float yaw)
@@ -49,7 +49,7 @@ static class PlacementToolMirrorPostRotatePatch
     static void Postfix(PlacementTool __instance)
     {
         var blueprint = Traverse.Create(__instance).Field<Blueprint>("_selectedBlueprint").Value;
-        if (CameraHorizontalMirror.ShouldRotateAfterMirror(blueprint))
+        if (CameraRelativeMirrorRotation.ShouldRotateAfterMirror(blueprint))
             __instance.Rotate(180);
     }
 }
@@ -60,7 +60,7 @@ static class SelectionFactoryToolMirrorPostRotatePatch
     static void Postfix(SelectionFactoryTool __instance)
     {
         var blueprint = Traverse.Create(__instance).Field<Blueprint>("_selection").Value;
-        if (CameraHorizontalMirror.ShouldRotateAfterMirror(blueprint))
+        if (CameraRelativeMirrorRotation.ShouldRotateAfterMirror(blueprint))
             __instance.Rotate(180);
     }
 }

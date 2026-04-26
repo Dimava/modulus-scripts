@@ -10,9 +10,9 @@ using UnityEngine.EventSystems;
 /// Middle-click on the minimap resets the camera yaw to north (0 degrees).
 /// </summary>
 [ScriptEntry]
-public sealed class MinimapMiddleClickResetRotation : ScriptMod
+public sealed class MinimapMiddleClickNorthUp : ScriptMod
 {
-    private static MinimapMiddleClickResetRotation _instance;
+    private static MinimapMiddleClickNorthUp _instance;
 
     protected override void OnEnable()
     {
@@ -49,13 +49,13 @@ public sealed class MinimapMiddleClickResetRotation : ScriptMod
 /// <summary>
 /// Added to the minimap GameObject at runtime to intercept pointer click events.
 /// </summary>
-public class MinimapClickHandler : MonoBehaviour, IPointerClickHandler
+public class MinimapNorthUpClickHandler : MonoBehaviour, IPointerClickHandler
 {
     public void OnPointerClick(PointerEventData eventData)
     {
         if (eventData.button == PointerEventData.InputButton.Middle)
         {
-            MinimapMiddleClickResetRotation.ResetCameraRotation();
+            MinimapMiddleClickNorthUp.ResetCameraRotation();
         }
     }
 }
@@ -65,9 +65,9 @@ static class MinimapScrollViewControls_Awake_Patch
 {
     static void Postfix(MinimapScrollViewControls __instance)
     {
-        if (__instance.GetComponent<MinimapClickHandler>() == null)
+        if (__instance.GetComponent<MinimapNorthUpClickHandler>() == null)
         {
-            __instance.gameObject.AddComponent<MinimapClickHandler>();
+            __instance.gameObject.AddComponent<MinimapNorthUpClickHandler>();
         }
     }
 }

@@ -27,7 +27,7 @@ using UnityEngine.UI;
 /// Resource-mismatch confirmation dialogs (harvester pads) still apply as normal.
 /// </summary>
 [ScriptEntry]
-public sealed class ConnectionHotkey : ScriptMod
+public sealed class BuildingConnectionHotkeys : ScriptMod
 {
     protected override void OnEnable()
     {

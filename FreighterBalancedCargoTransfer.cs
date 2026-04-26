@@ -5,7 +5,7 @@ using HarmonyLib;
 using ScriptEngine;
 
 [ScriptEntry]
-public sealed class FreighterUnloadAndLoadEqualizer : ScriptMod
+public sealed class FreighterBalancedCargoTransfer : ScriptMod
 {
     protected override void OnEnable()
     {

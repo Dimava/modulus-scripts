@@ -11,9 +11,9 @@ using UnityEngine.UI;
 /// Falls back to Ctrl+M if the button placement is not visible.
 /// </summary>
 [ScriptEntry]
-public sealed class MinimapFullscreenButton : ScriptMod
+public sealed class MinimapFullscreenToggle : ScriptMod
 {
-    private static MinimapFullscreenButton _instance;
+    private static MinimapFullscreenToggle _instance;
 
     protected override void OnEnable()
     {
@@ -39,7 +39,7 @@ public sealed class MinimapFullscreenButton : ScriptMod
     }
 }
 
-public sealed class MinimapFullscreenController : MonoBehaviour
+public sealed class MinimapFullscreenToggleController : MonoBehaviour
 {
     private struct RectTransformState
     {
@@ -68,7 +68,7 @@ public sealed class MinimapFullscreenController : MonoBehaviour
     private const float TopSafeMargin = 96f;
     private const float BottomMargin = 48f;
 
-    private static MinimapFullscreenController _lastActive;
+    private static MinimapFullscreenToggleController _lastActive;
 
     private MinimapUI _minimapUI;
     private RectTransform _panelRect;
@@ -107,7 +107,7 @@ public sealed class MinimapFullscreenController : MonoBehaviour
             return;
         }
 
-        foreach (MinimapFullscreenController controller in Resources.FindObjectsOfTypeAll<MinimapFullscreenController>())
+        foreach (MinimapFullscreenToggleController controller in Resources.FindObjectsOfTypeAll<MinimapFullscreenToggleController>())
         {
             if (controller != null && controller.isActiveAndEnabled)
             {
@@ -116,7 +116,7 @@ public sealed class MinimapFullscreenController : MonoBehaviour
             }
         }
 
-        MinimapFullscreenButton.LogWarn("No active minimap window found for fullscreen toggle.");
+        MinimapFullscreenToggle.LogWarn("No active minimap window found for fullscreen toggle.");
     }
 
     public static void DumpAnyVisible(string reason)
@@ -128,7 +128,7 @@ public sealed class MinimapFullscreenController : MonoBehaviour
             dumped = true;
         }
 
-        foreach (MinimapFullscreenController controller in Resources.FindObjectsOfTypeAll<MinimapFullscreenController>())
+        foreach (MinimapFullscreenToggleController controller in Resources.FindObjectsOfTypeAll<MinimapFullscreenToggleController>())
         {
             if (controller == null || ReferenceEquals(controller, _lastActive))
             {
@@ -141,7 +141,7 @@ public sealed class MinimapFullscreenController : MonoBehaviour
 
         if (!dumped)
         {
-            MinimapFullscreenButton.LogWarn($"No minimap controller instances found to dump for '{reason}'.");
+            MinimapFullscreenToggle.LogWarn($"No minimap controller instances found to dump for '{reason}'.");
         }
     }
 
@@ -225,7 +225,7 @@ public sealed class MinimapFullscreenController : MonoBehaviour
             return;
         }
 
-        GameObject buttonObject = new GameObject("DimavaMinimapFullscreenButton", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+        GameObject buttonObject = new GameObject("DimavaMinimapFullscreenToggle", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
         RectTransform buttonRect = buttonObject.GetComponent<RectTransform>();
         Transform buttonParent = (_closeButton != null && _closeButton.transform.parent != null) ? _closeButton.transform.parent : _targetRect;
         buttonObject.transform.SetParent(buttonParent, false);
@@ -320,7 +320,7 @@ public sealed class MinimapFullscreenController : MonoBehaviour
         Canvas rootCanvas = FindRootCanvas();
         if (rootCanvas == null)
         {
-            MinimapFullscreenButton.LogWarn("Could not find root canvas for fullscreen minimap.");
+            MinimapFullscreenToggle.LogWarn("Could not find root canvas for fullscreen minimap.");
             return;
         }
 
@@ -357,7 +357,7 @@ public sealed class MinimapFullscreenController : MonoBehaviour
 
         _isFullscreen = true;
         UpdateButtonLabel();
-        MinimapFullscreenButton.LogInfo($"Maximized minimap group '{GetPath(_targetRect)}' bounds={activeBounds.width:0.#}x{activeBounds.height:0.#} widthScale={widthScale:0.###} heightScale={heightScale:0.###}.");
+        MinimapFullscreenToggle.LogInfo($"Maximized minimap group '{GetPath(_targetRect)}' bounds={activeBounds.width:0.#}x{activeBounds.height:0.#} widthScale={widthScale:0.###} heightScale={heightScale:0.###}.");
     }
 
     private void ExitFullscreen()
@@ -453,7 +453,7 @@ public sealed class MinimapFullscreenController : MonoBehaviour
             _didLogTarget = true;
             string closeName = _closeButton != null ? _closeButton.name : "<none>";
             string titleName = _titleRect != null ? _titleRect.name : "<none>";
-            MinimapFullscreenButton.LogInfo($"Resolved minimap maximize target='{GetPath(_targetRect)}' title='{titleName}' close='{closeName}'.");
+            MinimapFullscreenToggle.LogInfo($"Resolved minimap maximize target='{GetPath(_targetRect)}' title='{titleName}' close='{closeName}'.");
         }
     }
 
@@ -548,7 +548,7 @@ public sealed class MinimapFullscreenController : MonoBehaviour
             SetFixedTopRect(dividerRects[i], usableWidth, 8f, dividerTop);
         }
 
-        MinimapFullscreenButton.LogInfo($"Applied maximized layout width={usableWidth:0.#} totalHeight={totalHeight:0.#} panelHeight={newPanelHeight:0.#} mapHeight={newMapHeight:0.#} viewport={newViewportWidth:0.#}x{newViewportHeight:0.#}.");
+        MinimapFullscreenToggle.LogInfo($"Applied maximized layout width={usableWidth:0.#} totalHeight={totalHeight:0.#} panelHeight={newPanelHeight:0.#} mapHeight={newMapHeight:0.#} viewport={newViewportWidth:0.#}x{newViewportHeight:0.#}.");
     }
 
     private void SaveRectState(RectTransform rect)
@@ -697,7 +697,7 @@ public sealed class MinimapFullscreenController : MonoBehaviour
         AppendTree(sb, subtreeRoot, 0, 4, 12);
         sb.AppendLine("Buttons near panel parent:");
         AppendButtons(sb, subtreeRoot);
-        MinimapFullscreenButton.LogInfo(sb.ToString().TrimEnd());
+        MinimapFullscreenToggle.LogInfo(sb.ToString().TrimEnd());
     }
 
     private void ApplyRelativeMinimapZoom(float factor, string reason)
@@ -716,7 +716,7 @@ public sealed class MinimapFullscreenController : MonoBehaviour
         RectTransform content = scroll.Field("_content").GetValue<RectTransform>();
         if (content == null)
         {
-            MinimapFullscreenButton.LogWarn($"Minimap zoom adjustment skipped during {reason}: no content rect.");
+            MinimapFullscreenToggle.LogWarn($"Minimap zoom adjustment skipped during {reason}: no content rect.");
             return;
         }
 
@@ -728,7 +728,7 @@ public sealed class MinimapFullscreenController : MonoBehaviour
         content.localScale = Vector3.one * newCurrentScale;
         scroll.Field("_currentScale").SetValue(newCurrentScale);
         scroll.Field("_targetScale").SetValue(newTargetScale);
-        MinimapFullscreenButton.LogInfo($"Adjusted minimap zoom during {reason}: factor={factor:0.###} current={currentScale:0.###}->{newCurrentScale:0.###} target={targetScale:0.###}->{newTargetScale:0.###} anchored={content.anchoredPosition.x:0.#},{content.anchoredPosition.y:0.#}.");
+        MinimapFullscreenToggle.LogInfo($"Adjusted minimap zoom during {reason}: factor={factor:0.###} current={currentScale:0.###}->{newCurrentScale:0.###} target={targetScale:0.###}->{newTargetScale:0.###} anchored={content.anchoredPosition.x:0.#},{content.anchoredPosition.y:0.#}.");
     }
 
     private string DescribeScrollState()
@@ -1095,14 +1095,14 @@ public sealed class MinimapFullscreenController : MonoBehaviour
 }
 
 [HarmonyPatch(typeof(MinimapUI), "Awake")]
-static class MinimapFullscreenButton_MinimapUI_Awake_Patch
+static class MinimapFullscreenToggle_MinimapUI_Awake_Patch
 {
     static void Postfix(MinimapUI __instance)
     {
-        MinimapFullscreenController controller = __instance.GetComponent<MinimapFullscreenController>();
+        MinimapFullscreenToggleController controller = __instance.GetComponent<MinimapFullscreenToggleController>();
         if (controller == null)
         {
-            controller = __instance.gameObject.AddComponent<MinimapFullscreenController>();
+            controller = __instance.gameObject.AddComponent<MinimapFullscreenToggleController>();
         }
 
         controller.Setup(__instance);
@@ -1110,14 +1110,14 @@ static class MinimapFullscreenButton_MinimapUI_Awake_Patch
 }
 
 [HarmonyPatch(typeof(MinimapUI), "ShowPanel")]
-static class MinimapFullscreenButton_MinimapUI_ShowPanel_Patch
+static class MinimapFullscreenToggle_MinimapUI_ShowPanel_Patch
 {
     static void Postfix(MinimapUI __instance)
     {
-        MinimapFullscreenController controller = __instance.GetComponent<MinimapFullscreenController>();
+        MinimapFullscreenToggleController controller = __instance.GetComponent<MinimapFullscreenToggleController>();
         if (controller == null)
         {
-            controller = __instance.gameObject.AddComponent<MinimapFullscreenController>();
+            controller = __instance.gameObject.AddComponent<MinimapFullscreenToggleController>();
         }
 
         controller.Setup(__instance);

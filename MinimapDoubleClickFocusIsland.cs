@@ -12,9 +12,9 @@ using UnityEngine.EventSystems;
 /// to the island center, and zooms to a good overview distance.
 /// </summary>
 [ScriptEntry]
-public sealed class MinimapIslandDoubleClick : ScriptMod
+public sealed class MinimapDoubleClickFocusIsland : ScriptMod
 {
-    private static MinimapIslandDoubleClick _instance;
+    private static MinimapDoubleClickFocusIsland _instance;
 
     // Zoom percentage: 0 = fully zoomed out, 1 = fully zoomed in.
     // 0.25 gives a comfortable island overview.
@@ -63,7 +63,7 @@ public sealed class MinimapIslandDoubleClick : ScriptMod
 /// Attached to each MinimapIslandUI GameObject at runtime.
 /// Handles double-click → fly-to-island.
 /// </summary>
-public class MinimapIslandClickHandler : MonoBehaviour, IPointerClickHandler
+public class MinimapFocusIslandClickHandler : MonoBehaviour, IPointerClickHandler
 {
     private IslandObject _islandObject;
 
@@ -79,10 +79,10 @@ public class MinimapIslandClickHandler : MonoBehaviour, IPointerClickHandler
             return;
         }
 
-        CameraView cameraView = MinimapIslandDoubleClick.FindCameraView();
+        CameraView cameraView = MinimapDoubleClickFocusIsland.FindCameraView();
         if (cameraView == null)
         {
-            MinimapIslandDoubleClick.LogWarn("CameraView not found.");
+            MinimapDoubleClickFocusIsland.LogWarn("CameraView not found.");
             return;
         }
 
@@ -91,13 +91,13 @@ public class MinimapIslandClickHandler : MonoBehaviour, IPointerClickHandler
 
         cameraView.LerpToTarget(
             worldCenter,
-            MinimapIslandDoubleClick.IslandZoomPercentage,
+            MinimapDoubleClickFocusIsland.IslandZoomPercentage,
             0f,                                      // targetYaw  — north
-            MinimapIslandDoubleClick.IslandPitch,    // targetPitch
+            MinimapDoubleClickFocusIsland.IslandPitch,    // targetPitch
             false                                    // blockInput
         );
 
-        MinimapIslandDoubleClick.LogInfo($"Flying to island at {worldCenter}.");
+        MinimapDoubleClickFocusIsland.LogInfo($"Flying to island at {worldCenter}.");
     }
 }
 
@@ -106,10 +106,10 @@ static class MinimapIslandUI_SetIslandTexture_Patch
 {
     static void Postfix(MinimapIslandUI __instance, IslandObject islandObject)
     {
-        MinimapIslandClickHandler handler = __instance.GetComponent<MinimapIslandClickHandler>();
+        MinimapFocusIslandClickHandler handler = __instance.GetComponent<MinimapFocusIslandClickHandler>();
         if (handler == null)
         {
-            handler = __instance.gameObject.AddComponent<MinimapIslandClickHandler>();
+            handler = __instance.gameObject.AddComponent<MinimapFocusIslandClickHandler>();
         }
         handler.SetIsland(islandObject);
     }

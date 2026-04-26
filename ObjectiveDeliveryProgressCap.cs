@@ -9,9 +9,9 @@ using ScriptEngine;
 using UnityEngine;
 
 [ScriptEntry]
-public sealed class ClampDeliveries : ScriptMod
+public sealed class ObjectiveDeliveryProgressCap : ScriptMod
 {
-    private static ClampDeliveries? _instance;
+    private static ObjectiveDeliveryProgressCap? _instance;
     private static readonly Dictionary<RotationIndependentHash, uint> ChallengeCaps = new Dictionary<RotationIndependentHash, uint>();
     private static readonly Dictionary<int, uint> DeliveryCaps = new Dictionary<int, uint>();
 
@@ -236,7 +236,7 @@ static class StatisticsSO_ApplySaveData_ModuleChallengeClampPatch
 {
     static void Postfix(StatisticsSO __instance)
     {
-        ClampDeliveries.NormalizeDeliveredStats(__instance);
+        ObjectiveDeliveryProgressCap.NormalizeDeliveredStats(__instance);
     }
 }
 
@@ -246,7 +246,7 @@ static class StatisticsSO_AddDeliveredStatistic_DeliveryClampPatch
     static bool Prefix(StatisticsSO __instance, int resourceId, uint addAmount)
     {
         uint cap;
-        if (!ClampDeliveries.TryGetDeliveryCap(resourceId, out cap))
+        if (!ObjectiveDeliveryProgressCap.TryGetDeliveryCap(resourceId, out cap))
         {
             return true;
         }
@@ -266,7 +266,7 @@ static class StatisticsSO_AddDeliveredShapeStatistic_ModuleChallengeClampPatch
     {
         RotationIndependentHash challengeHash;
         uint cap;
-        if (!ClampDeliveries.TryGetChallengeCap(shapeHash, out challengeHash, out cap))
+        if (!ObjectiveDeliveryProgressCap.TryGetChallengeCap(shapeHash, out challengeHash, out cap))
         {
             return true;
         }
@@ -285,12 +285,12 @@ static class StatisticsSO_GetDeliveredStatistic_DeliveryClampPatch
     static void Postfix(int resourceId, ref uint __result)
     {
         uint cap;
-        if (!ClampDeliveries.TryGetDeliveryCap(resourceId, out cap))
+        if (!ObjectiveDeliveryProgressCap.TryGetDeliveryCap(resourceId, out cap))
         {
             return;
         }
 
-        __result = ClampDeliveries.ClampToCap(__result, cap);
+        __result = ObjectiveDeliveryProgressCap.ClampToCap(__result, cap);
     }
 }
 
@@ -301,7 +301,7 @@ static class StatisticsSO_GetDeliveredShapesStatistic_ModuleChallengeClampPatch
     {
         RotationIndependentHash challengeHash;
         uint cap;
-        if (!ClampDeliveries.TryGetChallengeCap(shapeHash, out challengeHash, out cap))
+        if (!ObjectiveDeliveryProgressCap.TryGetChallengeCap(shapeHash, out challengeHash, out cap))
         {
             return;
         }
@@ -312,7 +312,7 @@ static class StatisticsSO_GetDeliveredShapesStatistic_ModuleChallengeClampPatch
             value = canonicalValue;
         }
 
-        __result = ClampDeliveries.ClampToCap(value, cap);
+        __result = ObjectiveDeliveryProgressCap.ClampToCap(value, cap);
     }
 }
 
@@ -336,7 +336,7 @@ static class ExoportBehaviour_CanReceiveResource_ModuleChallengeClampPatch
         {
             RotationIndependentHash challengeHash;
             uint challengeCap;
-            if (!ClampDeliveries.TryGetChallengeCap(shapeResource.ShapeData.RotationIndependantHash, out challengeHash, out challengeCap))
+            if (!ObjectiveDeliveryProgressCap.TryGetChallengeCap(shapeResource.ShapeData.RotationIndependantHash, out challengeHash, out challengeCap))
             {
                 return;
             }
@@ -349,7 +349,7 @@ static class ExoportBehaviour_CanReceiveResource_ModuleChallengeClampPatch
         }
 
         uint deliveryCap;
-        if (ClampDeliveries.TryGetDeliveryCap(resource.Data.ID, out deliveryCap)
+        if (ObjectiveDeliveryProgressCap.TryGetDeliveryCap(resource.Data.ID, out deliveryCap)
             && statisticsSO.GetDeliveredStatistic(resource.Data.ID) >= deliveryCap)
         {
             __result = false;
