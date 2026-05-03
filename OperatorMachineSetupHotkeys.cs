@@ -25,30 +25,22 @@ public sealed class OperatorMachineSetupHotkeys : ScriptMod
 
     protected override void OnUpdate()
     {
-        CutterUIInterval interval = FindActiveObjectOfType<CutterUIInterval>();
-        if (interval != null)
+        int requestedInterval = 0;
+        if (WasPressed("keyCutInterval1"))
+            requestedInterval = 1;
+        else if (WasPressed("keyCutInterval2"))
+            requestedInterval = 2;
+        else if (WasPressed("keyCutInterval3"))
+            requestedInterval = 3;
+        else if (WasPressed("keyCutInterval4"))
+            requestedInterval = 4;
+
+        if (requestedInterval != 0)
         {
-            if (WasPressed("keyCutInterval1"))
+            CutterUIInterval interval = FindActiveObjectOfType<CutterUIInterval>();
+            if (interval != null)
             {
-                TrySetInterval(interval, 1);
-                return;
-            }
-
-            if (WasPressed("keyCutInterval2"))
-            {
-                TrySetInterval(interval, 2);
-                return;
-            }
-
-            if (WasPressed("keyCutInterval3"))
-            {
-                TrySetInterval(interval, 3);
-                return;
-            }
-
-            if (WasPressed("keyCutInterval4"))
-            {
-                TrySetInterval(interval, 4);
+                TrySetInterval(interval, requestedInterval);
                 return;
             }
         }

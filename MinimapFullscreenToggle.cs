@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Text;
 using Data.Minimap;
 using HarmonyLib;
+using Presentation.UI.Menus;
 using ScriptEngine;
 using UnityEngine;
 using UnityEngine.UI;
@@ -61,6 +62,14 @@ public sealed class MinimapFullscreenToggleController : MonoBehaviour
         public bool Enabled;
     }
 
+    private struct ScrollZoomState
+    {
+        public bool Valid;
+        public float CurrentScale;
+        public float TargetScale;
+        public Vector2 AnchoredPosition;
+    }
+
     private const string FullscreenLabel = "MAX";
     private const string WindowedLabel = "REST";
     private static readonly Vector2 CenterAnchor = new Vector2(0.5f, 0.5f);
@@ -97,7 +106,11 @@ public sealed class MinimapFullscreenToggleController : MonoBehaviour
     private GameObject _overlay;
     private bool _isFullscreen;
     private bool _didLogTarget;
-    private float _appliedZoomFactor = 1f;
+    private ScrollZoomState _windowedZoomState;
+    private ScrollZoomState _fullscreenZoomState;
+    private bool _hasFullscreenZoomState;
+    private bool _hasWindowedMinScale;
+    private float _windowedMinScale;
 
     public static void ToggleAnyVisible()
     {
@@ -145,6 +158,26 @@ public sealed class MinimapFullscreenToggleController : MonoBehaviour
         }
     }
 
+    public static bool CloseAnyFullscreen()
+    {
+        if (_lastActive != null && _lastActive._isFullscreen)
+        {
+            _lastActive.ExitFullscreen();
+            return true;
+        }
+
+        foreach (MinimapFullscreenToggleController controller in Resources.FindObjectsOfTypeAll<MinimapFullscreenToggleController>())
+        {
+            if (controller != null && controller._isFullscreen)
+            {
+                controller.ExitFullscreen();
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public void Setup(MinimapUI minimapUI)
     {
         _minimapUI = minimapUI;
@@ -186,6 +219,12 @@ public sealed class MinimapFullscreenToggleController : MonoBehaviour
 
     private void LateUpdate()
     {
+        if (_isFullscreen && Input.GetKeyDown(KeyCode.Escape))
+        {
+            ExitFullscreen();
+            return;
+        }
+
         if (_toggleButton == null)
         {
             EnsureButton();
@@ -351,9 +390,8 @@ public sealed class MinimapFullscreenToggleController : MonoBehaviour
         _targetRect.localRotation = Quaternion.identity;
 
         ApplyMaximizedLayout(rootCanvasRect, out widthScale, out heightScale);
-        float viewportScale = Mathf.Max(1f, Mathf.Min(widthScale, heightScale));
-        _appliedZoomFactor = 1f / viewportScale;
-        ApplyRelativeMinimapZoom(_appliedZoomFactor, "maximize-enter");
+        _windowedZoomState = CaptureMinimapZoomState();
+        ApplyFullscreenMinimapZoom("maximize-enter");
 
         _isFullscreen = true;
         UpdateButtonLabel();
@@ -367,7 +405,10 @@ public sealed class MinimapFullscreenToggleController : MonoBehaviour
             return;
         }
 
-        ApplyRelativeMinimapZoom(1f / Mathf.Max(0.01f, _appliedZoomFactor), "maximize-exit");
+        _fullscreenZoomState = CaptureMinimapZoomState();
+        _hasFullscreenZoomState = _fullscreenZoomState.Valid;
+        ApplyMinimapZoomState(_windowedZoomState, "maximize-exit");
+        RestoreWindowedScaleLimits();
         RestoreModifiedRects();
         RestoreModifiedBehaviours();
 
@@ -393,7 +434,8 @@ public sealed class MinimapFullscreenToggleController : MonoBehaviour
         }
 
         _isFullscreen = false;
-        _appliedZoomFactor = 1f;
+        _windowedZoomState = default;
+        _hasWindowedMinScale = false;
         UpdateButtonLabel();
     }
 
@@ -700,14 +742,98 @@ public sealed class MinimapFullscreenToggleController : MonoBehaviour
         MinimapFullscreenToggle.LogInfo(sb.ToString().TrimEnd());
     }
 
-    private void ApplyRelativeMinimapZoom(float factor, string reason)
+    private ScrollZoomState CaptureMinimapZoomState()
     {
         if (_scrollControls == null)
         {
             _scrollControls = _minimapUI != null ? _minimapUI.GetComponentInChildren<MinimapScrollViewControls>(includeInactive: true) : null;
         }
 
-        if (_scrollControls == null || Mathf.Approximately(factor, 1f))
+        if (_scrollControls == null)
+        {
+            return default;
+        }
+
+        Traverse scroll = Traverse.Create(_scrollControls);
+        RectTransform content = scroll.Field("_content").GetValue<RectTransform>();
+        if (content == null)
+        {
+            return default;
+        }
+
+        return new ScrollZoomState
+        {
+            Valid = true,
+            CurrentScale = scroll.Field("_currentScale").GetValue<float>(),
+            TargetScale = scroll.Field("_targetScale").GetValue<float>(),
+            AnchoredPosition = content.anchoredPosition
+        };
+    }
+
+    private void ApplyFullscreenMinimapZoom(string reason)
+    {
+        ScrollZoomState state = _hasFullscreenZoomState ? _fullscreenZoomState : CreateInitialFullscreenZoomState();
+        ApplyFullscreenScaleLimits(state);
+        ApplyMinimapZoomState(state, reason);
+    }
+
+    private ScrollZoomState CreateInitialFullscreenZoomState()
+    {
+        if (_scrollControls == null)
+        {
+            _scrollControls = _minimapUI != null ? _minimapUI.GetComponentInChildren<MinimapScrollViewControls>(includeInactive: true) : null;
+        }
+
+        if (_scrollControls == null)
+        {
+            return default;
+        }
+
+        Traverse scroll = Traverse.Create(_scrollControls);
+        RectTransform viewport = scroll.Field("_viewport").GetValue<RectTransform>();
+        RectTransform content = scroll.Field("_content").GetValue<RectTransform>();
+        if (viewport == null || content == null)
+        {
+            return default;
+        }
+
+        float contentWidth = Mathf.Max(1f, content.rect.width);
+        float contentHeight = Mathf.Max(1f, content.rect.height);
+        MinimapData minimapData = _minimapUI != null ? _minimapUI.MinimapData : null;
+        if (minimapData != null)
+        {
+            contentWidth = Mathf.Max(contentWidth, minimapData.MapBounds.size.x);
+            contentHeight = Mathf.Max(contentHeight, minimapData.MapBounds.size.z);
+        }
+
+        float viewportWidth = Mathf.Max(1f, viewport.rect.width);
+        float viewportHeight = Mathf.Max(1f, viewport.rect.height);
+        float maxScale = Mathf.Max(0.01f, scroll.Field("_maxScale").GetValue<float>());
+        float fitScale = Mathf.Min(viewportWidth / contentWidth, viewportHeight / contentHeight);
+        fitScale = Mathf.Clamp(fitScale, 0.01f, maxScale);
+
+        return new ScrollZoomState
+        {
+            Valid = true,
+            CurrentScale = fitScale,
+            TargetScale = fitScale,
+            AnchoredPosition = Vector2.zero
+        };
+    }
+
+    private void ApplyMinimapZoomState(ScrollZoomState state, string reason)
+    {
+        if (!state.Valid)
+        {
+            return;
+        }
+
+        if (_scrollControls == null)
+        {
+            _scrollControls = _minimapUI != null ? _minimapUI.GetComponentInChildren<MinimapScrollViewControls>(includeInactive: true) : null;
+        }
+
+        if (_scrollControls == null)
         {
             return;
         }
@@ -716,19 +842,66 @@ public sealed class MinimapFullscreenToggleController : MonoBehaviour
         RectTransform content = scroll.Field("_content").GetValue<RectTransform>();
         if (content == null)
         {
-            MinimapFullscreenToggle.LogWarn($"Minimap zoom adjustment skipped during {reason}: no content rect.");
+            MinimapFullscreenToggle.LogWarn($"Minimap zoom state skipped during {reason}: no content rect.");
             return;
         }
 
         float currentScale = scroll.Field("_currentScale").GetValue<float>();
         float targetScale = scroll.Field("_targetScale").GetValue<float>();
-        float newCurrentScale = Mathf.Max(0.01f, currentScale * factor);
-        float newTargetScale = Mathf.Max(0.01f, targetScale * factor);
-        content.anchoredPosition *= factor;
+        float newCurrentScale = Mathf.Max(0.01f, state.CurrentScale);
+        float newTargetScale = Mathf.Max(0.01f, state.TargetScale);
+        content.anchoredPosition = state.AnchoredPosition;
         content.localScale = Vector3.one * newCurrentScale;
         scroll.Field("_currentScale").SetValue(newCurrentScale);
         scroll.Field("_targetScale").SetValue(newTargetScale);
-        MinimapFullscreenToggle.LogInfo($"Adjusted minimap zoom during {reason}: factor={factor:0.###} current={currentScale:0.###}->{newCurrentScale:0.###} target={targetScale:0.###}->{newTargetScale:0.###} anchored={content.anchoredPosition.x:0.#},{content.anchoredPosition.y:0.#}.");
+        MinimapFullscreenToggle.LogInfo($"Applied minimap zoom state during {reason}: current={currentScale:0.###}->{newCurrentScale:0.###} target={targetScale:0.###}->{newTargetScale:0.###} anchored={content.anchoredPosition.x:0.#},{content.anchoredPosition.y:0.#}.");
+    }
+
+    private void ApplyFullscreenScaleLimits(ScrollZoomState fullscreenState)
+    {
+        if (!fullscreenState.Valid)
+        {
+            return;
+        }
+
+        if (_scrollControls == null)
+        {
+            _scrollControls = _minimapUI != null ? _minimapUI.GetComponentInChildren<MinimapScrollViewControls>(includeInactive: true) : null;
+        }
+
+        if (_scrollControls == null)
+        {
+            return;
+        }
+
+        Traverse scroll = Traverse.Create(_scrollControls);
+        float minScale = scroll.Field("_minScale").GetValue<float>();
+        if (!_hasWindowedMinScale)
+        {
+            _windowedMinScale = minScale;
+            _hasWindowedMinScale = true;
+        }
+
+        float fullscreenMinScale = Mathf.Min(_windowedMinScale, Mathf.Max(0.01f, fullscreenState.CurrentScale));
+        scroll.Field("_minScale").SetValue(fullscreenMinScale);
+    }
+
+    private void RestoreWindowedScaleLimits()
+    {
+        if (!_hasWindowedMinScale)
+        {
+            return;
+        }
+
+        if (_scrollControls == null)
+        {
+            _scrollControls = _minimapUI != null ? _minimapUI.GetComponentInChildren<MinimapScrollViewControls>(includeInactive: true) : null;
+        }
+
+        if (_scrollControls != null)
+        {
+            Traverse.Create(_scrollControls).Field("_minScale").SetValue(_windowedMinScale);
+        }
     }
 
     private string DescribeScrollState()
@@ -1121,5 +1294,14 @@ static class MinimapFullscreenToggle_MinimapUI_ShowPanel_Patch
         }
 
         controller.Setup(__instance);
+    }
+}
+
+[HarmonyPatch(typeof(UIMenuManager), "HandleEscapeAction")]
+static class MinimapFullscreenToggle_UIMenuManager_HandleEscapeAction_Patch
+{
+    static bool Prefix()
+    {
+        return !MinimapFullscreenToggleController.CloseAnyFullscreen();
     }
 }

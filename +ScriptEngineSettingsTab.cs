@@ -11,7 +11,7 @@ using UnityEngine.UI;
 
 // @Name: Settings ScriptEngine Tab
 // @Description: Adds a Settings tab with ScriptEngine mod enable toggles.
-// @Version: 1.1.4
+// @Version: 1.1.5
 // @Author: Dimava
 
 [ScriptEntry]
@@ -338,6 +338,16 @@ public sealed class ScriptEngineSettingsTab : ScriptMod
         button.ID = tabIndex;
         button.ActiveState = false;
         button.ShowButton();
+
+        foreach (LocalizedTMPText localizedText in button.GetComponentsInChildren<LocalizedTMPText>(true))
+        {
+            localizedText.enabled = false;
+        }
+
+        foreach (LocalizedText localizedText in button.GetComponentsInChildren<LocalizedText>(true))
+        {
+            localizedText.enabled = false;
+        }
 
         foreach (TMP_Text text in button.GetComponentsInChildren<TMP_Text>(true))
         {
